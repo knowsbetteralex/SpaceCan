@@ -1,0 +1,5 @@
+*.bin
+*.tap
+*.sna
+*.z80
+__pycache__/
