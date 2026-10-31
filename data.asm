@@ -29,6 +29,73 @@ SHIP_BG_ATTR:
 SHIP_BG_BITMAP:
     DS 16,0
 
+SHIP_HP:
+    DB 100                      ; 100 -> 75 -> 50 -> 25 -> 0
+
+; Four fixed lanes; no two enemies intersect horizontally.
+ENEMY_START_TABLE:
+    DB 0,8,2                    ; small asteroid, left
+    DB 1,12,11                  ; large asteroid, mid-left
+    DB 0,19,5                   ; small asteroid, mid-right
+    DB 1,23,16                  ; large asteroid, right
+
+ENEMY_MOVE_TIMER:
+    DB 4
+ENEMY_MOVE_NOW:
+    DB 0
+
+ENEMY_POOL:
+    DS MAX_ENEMIES*ENEMY_SLOT_SIZE,0
+
+ENEMY_ATTR_SMALL:
+    DB #42                      ; bright red
+ENEMY_ATTR_LARGE:
+    DB #45,#45                  ; bright cyan
+
+ENEMY_FRAMES:
+    DW ENEMY_SMALL_0,ENEMY_SMALL_1
+    DW ENEMY_LARGE_0,ENEMY_LARGE_1
+
+ENEMY_SMALL_0:
+    DB %00011000
+    DB %00111100
+    DB %01111110
+    DB %11101111
+    DB %11111111
+    DB %01110110
+    DB %00111100
+    DB %00011000
+
+ENEMY_SMALL_1:
+    DB %00110000
+    DB %01111000
+    DB %11111100
+    DB %11111010
+    DB %01111111
+    DB %00111011
+    DB %00011110
+    DB %00001100
+
+ENEMY_LARGE_0:
+    DB #03,#C0
+    DB #0F,#F0
+    DB #3F,#FC
+    DB #7B,#DE
+    DB #FF,#FF
+    DB #ED,#B7
+    DB #7F,#FE
+    DB #1F,#F8
+
+ENEMY_LARGE_1:
+    DB #07,#E0
+    DB #1F,#F8
+    DB #7F,#FE
+    DB #DF,#FB
+    DB #FF,#FF
+    DB #B7,#ED
+    DB #3F,#FC
+    DB #0F,#F0
+
 BULLET_COUNT:
     DB 0                        ; active bullets (0..6)
 ; All state/last-screen-position/background are stored in each slot.
