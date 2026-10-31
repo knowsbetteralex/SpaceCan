@@ -130,8 +130,10 @@ ON_STAR_HIT:
     LD A,1
     LD (BLAST_ACTIVE),A
     LD (BLAST_DIRTY),A
-    LD A,2
-    OUT (#FE),A                 ; flash red on hit
+    IFN DEBUG_BORDER
+        LD A,2
+        OUT (#FE),A             ; red hit flash in release mode
+    ENDIF
     RET
 
 ; One-shot explosion: four phases, four ticks per phase.
@@ -157,7 +159,9 @@ UPDATE_BLAST_ANIM:
     LD (BLAST_ACTIVE),A
     LD A,1
     LD (BLAST_DIRTY),A
-    OUT (#FE),A                 ; blue border restored
+    IFN DEBUG_BORDER
+        OUT (#FE),A             ; blue border restored in release mode
+    ENDIF
     RET
 
 ; IN: BLAST_FRAME=0..3. OUT: BLAST_FRAME_PTR updated.

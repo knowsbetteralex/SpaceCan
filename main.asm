@@ -13,6 +13,8 @@ PLAYFIELD_TOP        EQU 2
 MAX_BULLETS          EQU 6
 BULLET_SLOT_SIZE     EQU 16
 
+    INCLUDE "diagnostics.asm"
+
 ; Each bullet slot is exactly 16 bytes (offsets from IX).
 B_ACTIVE    EQU 0  ; 0=free, 1=just spawned, 2=flying
 B_X         EQU 1
@@ -71,10 +73,15 @@ START:
 
 MAIN_LOOP:
     HALT
+    DEBUG_PHASE DBG_RENDER_COLOUR
     CALL RENDER_FRAME            ; all graphics first
+    DEBUG_PHASE DBG_HUD_COLOUR
     CALL RENDER_HUD              ; only when UI fields changed
+    DEBUG_PHASE DBG_INPUT_COLOUR
     CALL READ_INPUT              ; capture next game state
+    DEBUG_PHASE DBG_LOGIC_COLOUR
     CALL UPDATE_GAME             ; movement, hits, animations
+    DEBUG_PHASE DBG_IDLE_COLOUR ; visible idle border during HALT
     JR MAIN_LOOP
 
     INCLUDE "logic.asm"
