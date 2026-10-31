@@ -64,6 +64,12 @@ UPDATE_BULLET_SLOT:
     LD A,(IX+B_ACTIVE)
     OR A
     RET Z
+    ; An asteroid may have moved onto this bullet's previous cell.
+    ; Resolve it before the bullet advances.
+    CALL CHECK_BULLET_COLLISION
+    LD A,(IX+B_ACTIVE)
+    OR A
+    RET Z
     CP 1
     JR NZ,.FLYING
     ; The first tick after SPACE only makes the new bullet ready.
@@ -93,27 +99,10 @@ BULLET_STEP_ONE:
 .EXIT_FIELD:
     JP DEACTIVATE_BULLET
 
-; Static demo target occupies two cells: STAR_X and STAR_X+1.
-; The active blast also consumes overlapping bullets, ensuring that
-; independent objects never overlap in this demo's final frame.
+; Check moving enemies and absorb bullets entering an explosion.
 CHECK_BULLET_COLLISION:
-    LD A,(STAR_ALIVE)
-    OR A
-    JR Z,.CHECK_BLAST
-    LD A,(STAR_POS+1)
-    CP (IX+B_Y)
-    JR NZ,.CHECK_BLAST
-    LD A,(STAR_POS)
-    CP (IX+B_X)
-    JR Z,.STAR_HIT
-    INC A
-    CP (IX+B_X)
-    JR NZ,.CHECK_BLAST
-.STAR_HIT:
-    CALL DEACTIVATE_BULLET
-    JP ON_STAR_HIT
-
-.CHECK_BLAST:
+    CALL CHECK_BULLET_ENEMIES
+    RET C
     LD A,(BLAST_ACTIVE)
     OR A
     RET Z

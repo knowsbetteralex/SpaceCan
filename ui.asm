@@ -87,6 +87,27 @@ RENDER_HUD:
     LD BC,#0700                  ; left panel, below SPEED
     CALL DRAW_CHAR_AT
 
+    ; Health at top-right: 100, 075, 050, 025, 000.
+    LD A,(SHIP_HP)
+    LD BC,#001A                  ; HP digits start at X=26
+    CP 100
+    JR NZ,.HP_BELOW_100
+    LD A,'1'
+    JR .HP_HUNDREDS
+.HP_BELOW_100:
+    LD A,'0'
+.HP_HUNDREDS:
+    PUSH BC
+    CALL DRAW_CHAR_AT
+    POP BC
+    INC C
+    LD A,(SHIP_HP)
+    CP 100
+    JR NZ,.HP_LAST_TWO
+    XOR A
+.HP_LAST_TWO:
+    CALL PRINT_DEC2
+
     ; Active bullets in flight: two digits below "SHOTS".
     LD A,(BULLET_COUNT)
     LD BC,#111C                  ; Y=17, X=28

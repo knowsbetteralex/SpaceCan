@@ -104,22 +104,22 @@ READ_FIRE_KEY:
 ; Blast first: a new hit starts from full frame 0 duration.
 UPDATE_GAME:
     CALL UPDATE_BLAST_ANIM
+    CALL UPDATE_ENEMIES
     CALL UPDATE_BULLETS
+    CALL CHECK_SHIP_ENEMY_COLLISIONS
     RET
 
-; Called once when a bullet hits the static target.
-; All graphics changes will be processed in the NEXT render pass.
-ON_STAR_HIT:
-    LD A,(SCORE)
-    ADD A,10
-    LD (SCORE),A
-    LD A,1
-    LD (HUD_DIRTY),A
-    LD (STAR_DIRTY),A
-    XOR A
-    LD (STAR_ALIVE),A
-
-    LD HL,(STAR_POS)
+; Start an explosion at a destroyed asteroid (one effect slot).
+; IN: IX = asteroid slot. PRESERVES: IX. DESTROYS: AF, HL.
+START_ENEMY_BLAST:
+    LD A,(BLAST_ACTIVE)
+    OR A
+    RET NZ
+    LD A,(BLAST_DRAWN)
+    OR A
+    RET NZ
+    LD L,(IX+E_X)
+    LD H,(IX+E_Y)
     LD (BLAST_POS),HL
     LD HL,BLAST_FRAME_0
     LD (BLAST_FRAME_PTR),HL
@@ -132,7 +132,7 @@ ON_STAR_HIT:
     LD (BLAST_DIRTY),A
     IFN DEBUG_BORDER
         LD A,2
-        OUT (#FE),A             ; red hit flash in release mode
+        OUT (#FE),A
     ENDIF
     RET
 

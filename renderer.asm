@@ -7,6 +7,7 @@
 ; -------------------------------------------------------------
 RENDER_FRAME:
     CALL RENDER_ERASE_BULLETS
+    CALL RENDER_ERASE_ENEMIES
 
     LD A,(SHIP_DIRTY)
     OR A
@@ -26,31 +27,9 @@ RENDER_FRAME:
     XOR A
     LD (BLAST_DRAWN),A
 .BLAST_ERASE_DONE:
-    LD A,(STAR_DIRTY)
-    OR A
-    JR Z,.STAR_ERASE_DONE
-    LD A,(STAR_DRAWN)
-    OR A
-    CALL NZ,ERASE_STAR
-    XOR A
-    LD (STAR_DRAWN),A
-.STAR_ERASE_DONE:
-
     ; Next stage: update moving background here, while sprites
     ; whose old positions were affected have been erased.
 
-    LD A,(STAR_DIRTY)
-    OR A
-    JR Z,.STAR_DONE
-    XOR A
-    LD (STAR_DIRTY),A
-    LD A,(STAR_ALIVE)
-    OR A
-    JR Z,.STAR_DONE
-    CALL DRAW_STAR
-    LD A,1
-    LD (STAR_DRAWN),A
-.STAR_DONE:
     LD A,(BLAST_DIRTY)
     OR A
     JR Z,.BLAST_DONE
@@ -74,4 +53,5 @@ RENDER_FRAME:
     LD A,1
     LD (SHIP_DRAWN),A
 .SHIP_DONE:
+    CALL RENDER_DRAW_ENEMIES
     JP RENDER_DRAW_BULLETS

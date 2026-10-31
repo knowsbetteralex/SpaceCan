@@ -1,19 +1,6 @@
 ; -------------------------------------------------------------
 ; Object drawing: save underlying pixels + attributes, then draw.
 ; -------------------------------------------------------------
-DRAW_STAR:
-    LD BC,(STAR_POS)
-    CALL GET_SCREEN_ADDR
-    LD DE,STAR_BG_ATTR
-    CALL SAVE_ATTR_1_2
-    LD DE,STAR_BG_BITMAP
-    CALL SAVE_BITMAP_1_2
-    LD DE,STAR_ATTR
-    CALL RESTORE_ATTR_1_2
-    LD DE,STAR_SPRITE
-    CALL DRAW_1_2
-    RET
-
 DRAW_BLAST:
     LD BC,(BLAST_POS)
     CALL GET_SCREEN_ADDR
@@ -57,15 +44,6 @@ ERASE_BLAST:
     LD DE,BLAST_BG_ATTR
     CALL RESTORE_ATTR_1_2
     LD DE,BLAST_BG_BITMAP
-    CALL DRAW_1_2
-    RET
-
-ERASE_STAR:
-    LD BC,(STAR_POS)
-    CALL GET_SCREEN_ADDR
-    LD DE,STAR_BG_ATTR
-    CALL RESTORE_ATTR_1_2
-    LD DE,STAR_BG_BITMAP
     CALL DRAW_1_2
     RET
 

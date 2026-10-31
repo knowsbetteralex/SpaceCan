@@ -6,8 +6,6 @@ BG_ATTR:
 
 SHIP_START_POS:
     DB 15,22
-STAR_START_POS:
-    DB 15,7
 
 SHIP_SPRITE:
     DB #01,#80
@@ -29,28 +27,6 @@ SHIP_DRAWN:
 SHIP_BG_ATTR:
     DS 2,0
 SHIP_BG_BITMAP:
-    DS 16,0
-
-STAR_SPRITE:
-    DB #01,#80
-    DB #23,#C4
-    DB #17,#E8
-    DB #7F,#FE
-    DB #FF,#FF
-    DB #17,#E8
-    DB #23,#C4
-    DB #01,#80
-STAR_ATTR:
-    DB #45,#45                 ; bright cyan on black
-STAR_ALIVE:
-    DB 1
-STAR_POS:
-    DB 15,7
-STAR_DRAWN:
-    DB 0
-STAR_BG_ATTR:
-    DS 2,0
-STAR_BG_BITMAP:
     DS 16,0
 
 BULLET_COUNT:
@@ -130,7 +106,6 @@ BLAST_FRAME_3:
 
 ; Individual dirty flags for static target, blast, and player.
 ; Bullet dirty state is inside each bullet slot.
-STAR_DIRTY:      DB 1
 BLAST_DIRTY:     DB 0
 SHIP_DIRTY:      DB 1
 
