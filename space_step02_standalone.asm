@@ -14,6 +14,30 @@ PLAYFIELD_TOP        EQU 2
 MAX_BULLETS          EQU 6
 BULLET_SLOT_SIZE     EQU 16
 
+; -------------------------------------------------------------
+; Border phase diagnostics for ZX Spectrum 48K.
+;
+; Set DEBUG_BORDER=0 for a normal game build (no phase code emitted).
+; Current beeper driver is not installed yet. When enabling beeper
+; sound, use a shared #FE output routine to preserve MIC/EAR bits.
+; -------------------------------------------------------------
+
+DEBUG_BORDER EQU 1
+
+DBG_RENDER_COLOUR EQU 2  ; red: sprites/background
+DBG_HUD_COLOUR    EQU 6  ; yellow: HUD
+DBG_INPUT_COLOUR  EQU 5  ; cyan: keyboard
+DBG_LOGIC_COLOUR  EQU 4  ; green: game update
+DBG_IDLE_COLOUR   EQU 1  ; blue: remainder of frame / HALT
+
+MACRO DEBUG_PHASE colour
+    IF DEBUG_BORDER
+        LD A,colour
+        OUT (#FE),A
+    ENDIF
+ENDM
+
+
 ; Each bullet slot is exactly 16 bytes (offsets from IX).
 B_ACTIVE    EQU 0  ; 0=free, 1=just spawned, 2=flying
 B_X         EQU 1
@@ -72,18 +96,24 @@ START:
 
 MAIN_LOOP:
     HALT
+    DEBUG_PHASE DBG_RENDER_COLOUR
     CALL RENDER_FRAME            ; all graphics first
+    DEBUG_PHASE DBG_HUD_COLOUR
     CALL RENDER_HUD              ; only when UI fields changed
+    DEBUG_PHASE DBG_INPUT_COLOUR
     CALL READ_INPUT              ; capture next game state
+    DEBUG_PHASE DBG_LOGIC_COLOUR
     CALL UPDATE_GAME             ; movement, hits, animations
+    DEBUG_PHASE DBG_IDLE_COLOUR ; visible idle border during HALT
     JR MAIN_LOOP
 
-
-
-
-
-
-
+    INCLUDE "logic.asm"
+    INCLUDE "bullets.asm"
+    INCLUDE "renderer.asm"
+    INCLUDE "graphics.asm"
+    INCLUDE "objects.asm"
+    INCLUDE "ui.asm"
+    INCLUDE "data.asm"
 
 ; ===== logic.asm =====
 ; -------------------------------------------------------------
@@ -218,8 +248,10 @@ ON_STAR_HIT:
     LD A,1
     LD (BLAST_ACTIVE),A
     LD (BLAST_DIRTY),A
-    LD A,2
-    OUT (#FE),A                 ; flash red on hit
+    IFN DEBUG_BORDER
+        LD A,2
+        OUT (#FE),A             ; red hit flash in release mode
+    ENDIF
     RET
 
 ; One-shot explosion: four phases, four ticks per phase.
@@ -245,7 +277,9 @@ UPDATE_BLAST_ANIM:
     LD (BLAST_ACTIVE),A
     LD A,1
     LD (BLAST_DIRTY),A
-    OUT (#FE),A                 ; blue border restored
+    IFN DEBUG_BORDER
+        OUT (#FE),A             ; blue border restored in release mode
+    ENDIF
     RET
 
 ; IN: BLAST_FRAME=0..3. OUT: BLAST_FRAME_PTR updated.
@@ -261,7 +295,6 @@ SELECT_BLAST_FRAME:
     LD D,(HL)
     LD (BLAST_FRAME_PTR),DE
     RET
-
 
 ; ===== bullets.asm =====
 ; -------------------------------------------------------------
