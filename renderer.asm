@@ -1,9 +1,16 @@
 ; -------------------------------------------------------------
-; Independent dirty flags, two passes:
-;   1) Restore old backgrounds of ALL modified objects.
-;   2) Save the new backgrounds and draw only modified objects.
-; Non-overlap of game objects is enforced by game logic.
-; Background scroll will be inserted BETWEEN these passes later.
+; Selective two-pass rendering, opaque object sprites.
+;
+; All changed objects are first erased to the corridor base
+; attributes/bitmap, then their new pictures are drawn.
+; No bitmap save/restore per object.
+;
+; DIRTY is set on movement, animation tick, damage, spawning or
+; deactivation; it remains clear for an unchanged object.
+;
+; When moving stars are added later, their changed character cells
+; will mark intersecting objects DIRTY, before rendering, so stars
+; never punch through stationary opaque sprites.
 ; -------------------------------------------------------------
 RENDER_FRAME:
     CALL RENDER_ERASE_BULLETS
@@ -27,8 +34,8 @@ RENDER_FRAME:
     XOR A
     LD (BLAST_DRAWN),A
 .BLAST_ERASE_DONE:
-    ; Next stage: update moving background here, while sprites
-    ; whose old positions were affected have been erased.
+    ; Future starfield update belongs here.
+    ; Background changes must mark overlapping objects DIRTY.
 
     LD A,(BLAST_DIRTY)
     OR A

@@ -1,3 +1,4 @@
+; ===== main.asm =====
 ; ZX Space Demo - Step 03: moving asteroids and hit points.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
@@ -11,15 +12,15 @@ BLAST_FRAME_DURATION EQU 4
 BLAST_FRAME_COUNT    EQU 4
 PLAYFIELD_TOP        EQU 2
 MAX_BULLETS          EQU 6
-BULLET_SLOT_SIZE     EQU 16
+BULLET_SLOT_SIZE     EQU 8
 MAX_ENEMIES          EQU 4
-ENEMY_SLOT_SIZE      EQU 32
-ENEMY_FRAME_DELAY    EQU 6
+ENEMY_SLOT_SIZE      EQU 16
+ENEMY_FRAME_DELAY    EQU 4
 ENEMY_RESPAWN_DELAY  EQU 24
 
-; One 32-byte slot for either an 8x8 or a 16x8 enemy.
+; One 16-byte slot for opaque two-row asteroids; no saved background.
 E_ACTIVE       EQU 0
-E_TYPE         EQU 1           ; 0=8x8, 1=16x8
+E_TYPE         EQU 1           ; 0=8x16, 1=16x16
 E_HP           EQU 2
 E_X            EQU 3
 E_Y            EQU 4
@@ -29,9 +30,8 @@ E_DRAW_Y       EQU 7
 E_DIRTY        EQU 8
 E_FRAME        EQU 9
 E_ANIM_TIMER   EQU 10
-E_BG_ATTR      EQU 11          ; two attribute bytes
-E_BG_BITMAP    EQU 13          ; sixteen bitmap bytes
-E_RESPAWN      EQU 29
+E_RESPAWN      EQU 11
+E_PHASE        EQU 12          ; first animation timer value
 
 ; -------------------------------------------------------------
 ; Border phase diagnostics for ZX Spectrum 48K.
@@ -57,7 +57,7 @@ MACRO DEBUG_PHASE colour
 ENDM
 
 
-; Each bullet slot is exactly 16 bytes (offsets from IX).
+; Each bullet slot is exactly 8 bytes (offsets from IX).
 B_ACTIVE    EQU 0  ; 0=free, 1=just spawned, 2=flying
 B_X         EQU 1
 B_Y         EQU 2
@@ -65,8 +65,7 @@ B_DRAWN     EQU 3
 B_DRAW_X    EQU 4
 B_DRAW_Y    EQU 5
 B_DIRTY     EQU 6
-B_BG_ATTR   EQU 7
-B_BG_BITMAP EQU 8       ; 8 bytes at offsets 8..15
+B_RESERVED  EQU 7       ; padding; no saved background
 
 START:
     DI
@@ -75,7 +74,7 @@ START:
     LD A,1
     OUT (#FE),A                  ; blue border
 
-    ; Fully clear bullet slots, including their saved backgrounds.
+    ; Initialise bullet slots (state only, no saved background).
     LD HL,BULLET_POOL
     LD (HL),0
     LD DE,BULLET_POOL+1
@@ -104,6 +103,8 @@ START:
     LD HL,(SHIP_START_POS)
     LD (SHIP_CUR_POS),HL
     LD (SHIP_NEW_POS),HL
+    XOR A
+    LD (BLAST_TYPE),A
     LD HL,BLAST_FRAME_0
     LD (BLAST_FRAME_PTR),HL
 
@@ -236,7 +237,7 @@ UPDATE_GAME:
     RET
 
 ; Start an explosion at a destroyed asteroid (one effect slot).
-; IN: IX = asteroid slot. PRESERVES: IX. DESTROYS: AF, HL.
+; IN: IX = asteroid slot. PRESERVES: IX. DESTROYS: AF, DE, HL.
 START_ENEMY_BLAST:
     LD A,(BLAST_ACTIVE)
     OR A
@@ -247,10 +248,11 @@ START_ENEMY_BLAST:
     LD L,(IX+E_X)
     LD H,(IX+E_Y)
     LD (BLAST_POS),HL
-    LD HL,BLAST_FRAME_0
-    LD (BLAST_FRAME_PTR),HL
+    LD A,(IX+E_TYPE)
+    LD (BLAST_TYPE),A           ; 0=8x8, 1=16x8 explosion
     XOR A
     LD (BLAST_FRAME),A
+    CALL SELECT_BLAST_FRAME
     LD A,BLAST_FRAME_DURATION
     LD (BLAST_ANIM_TIMER),A
     LD A,1
@@ -296,7 +298,12 @@ SELECT_BLAST_FRAME:
     ADD A,A
     LD E,A
     LD D,0
+    LD A,(BLAST_TYPE)
+    OR A
+    LD HL,BLAST_SMALL_FRAMES
+    JR Z,.HAVE_TABLE
     LD HL,BLAST_FRAMES
+.HAVE_TABLE:
     ADD HL,DE
     LD E,(HL)
     INC HL
@@ -306,7 +313,7 @@ SELECT_BLAST_FRAME:
 
 ; ===== bullets.asm =====
 ; -------------------------------------------------------------
-; BULLET POOL (6 x 16 bytes)
+; BULLET POOL (6 x 8 bytes)
 ;
 ; A slot is reusable only when ACTIVE=0 and DRAWN=0.
 ; ACTIVE=0 free, 1 just spawned, 2 in flight.
@@ -419,6 +426,10 @@ CHECK_BULLET_COLLISION:
     LD A,(BLAST_POS)
     CP (IX+B_X)
     JR Z,.ABSORB
+    LD A,(BLAST_TYPE)
+    OR A
+    RET Z                       ; small explosion occupies only X
+    LD A,(BLAST_POS)
     INC A
     CP (IX+B_X)
     RET NZ
@@ -438,8 +449,8 @@ DEACTIVATE_BULLET:
     RET
 
 ; -------------------------------------------------------------
-; POOL RENDERING: two passes, shared with ship/star/blast.
-; Erase uses the last drawn coordinates, never the logical ones.
+; Selective bullet rendering. No saved background: erase old cell
+; to base corridor ink/paper, then draw active bullet opaque.
 ; -------------------------------------------------------------
 RENDER_ERASE_BULLETS:
     LD IX,BULLET_POOL
@@ -479,34 +490,15 @@ RENDER_DRAW_BULLETS:
     DJNZ .NEXT
     RET
 
-; IN: HL=screen address, IX=slot, BC=field offset (6/7).
-; OUT: DE=address of field within slot.
-; PRESERVES: HL, BC, IX. DESTROYS: DE.
-GET_BULLET_BUFFER:
-    PUSH HL
-    PUSH IX
-    POP HL
-    ADD HL,BC
-    EX DE,HL
-    POP HL
-    RET
-
-; Draw 8x8 bullet at logical position and save the background.
-; IX preserved; other registers may change.
+; IX preserved; all coordinates in character cells.
 DRAW_BULLET_SLOT:
     LD B,(IX+B_Y)
     LD C,(IX+B_X)
     CALL GET_SCREEN_ADDR
-    LD BC,B_BG_ATTR
-    CALL GET_BULLET_BUFFER
-    CALL SAVE_ATTR_1_1
-    LD BC,B_BG_BITMAP
-    CALL GET_BULLET_BUFFER
-    CALL SAVE_BITMAP_1_1
     LD DE,BULLET_ATTR
     CALL RESTORE_ATTR_1_1
     LD DE,BULLET_SPRITE
-    CALL DRAW_1_1_BLENDED
+    CALL DRAW_1_1
 
     LD A,(IX+B_X)
     LD (IX+B_DRAW_X),A
@@ -516,31 +508,25 @@ DRAW_BULLET_SLOT:
     LD (IX+B_DRAWN),A
     RET
 
-; Restore the saved background at the LAST DRAWN position.
 ERASE_BULLET_SLOT:
     LD B,(IX+B_DRAW_Y)
     LD C,(IX+B_DRAW_X)
     CALL GET_SCREEN_ADDR
-    LD BC,B_BG_ATTR
-    CALL GET_BULLET_BUFFER
-    CALL RESTORE_ATTR_1_1
-    LD BC,B_BG_BITMAP
-    CALL GET_BULLET_BUFFER
-    CALL DRAW_1_1
+    CALL CLEAR_CELL_1_1
     XOR A
     LD (IX+B_DRAWN),A
     RET
 
 ; ===== enemies.asm =====
 ; -------------------------------------------------------------
-; ENEMIES: four independent asteroids (8x8 and 16x8).
+; ENEMIES: four independent asteroids (8x16 and 16x16).
 ;
 ; IX -> current enemy slot in all *_ENEMY_SLOT routines.
-; Four fixed lanes never overlap each other or static STAR.
+; Four fixed lanes never overlap each other.
 ; Game logic updates state/dirty; renderer stores drawn position.
 ; -------------------------------------------------------------
 
-; Initialise four slots from ENEMY_START_TABLE: TYPE, X, Y.
+; Initialise four slots from ENEMY_START_TABLE: TYPE, X, Y, PHASE.
 INIT_ENEMIES:
     ; Reset all slot states even when game is restarted.
     LD HL,ENEMY_POOL
@@ -571,8 +557,11 @@ INIT_ENEMIES:
     LD A,1
     LD (IX+E_ACTIVE),A
     LD (IX+E_DIRTY),A
-    LD A,ENEMY_FRAME_DELAY
+    ; Stagger the four independent animation timers (1..4).
+    LD A,(HL)
     LD (IX+E_ANIM_TIMER),A
+    LD (IX+E_PHASE),A
+    INC HL
     LD DE,ENEMY_SLOT_SIZE
     ADD IX,DE
     DJNZ .NEXT
@@ -661,7 +650,7 @@ UPDATE_ENEMY_SLOT:
     LD (IX+E_HP),A
     XOR A
     LD (IX+E_FRAME),A
-    LD A,ENEMY_FRAME_DELAY
+    LD A,(IX+E_PHASE)
     LD (IX+E_ANIM_TIMER),A
     LD A,1
     LD (IX+E_ACTIVE),A
@@ -715,9 +704,11 @@ CHECK_SHIP_ENEMY_SLOT:
     LD A,(IX+E_ACTIVE)
     OR A
     RET Z
+    ; Ship may touch the top or bottom asteroid cell row.
     LD A,(SHIP_NEW_POS+1)
-    CP (IX+E_Y)
-    RET NZ
+    SUB (IX+E_Y)
+    CP 2
+    RET NC
     LD A,(SHIP_NEW_POS)
     LD C,A                       ; ship left column
     LD A,(IX+E_X)
@@ -757,9 +748,11 @@ CHECK_BULLET_ENEMIES:
     LD A,(IX+E_ACTIVE)
     OR A
     JR Z,.SKIP
-    LD A,(IX+E_Y)
-    CP B
-    JR NZ,.SKIP
+    ; Compare both cell rows Y and Y+1, without tunnelling.
+    LD A,B
+    SUB (IX+E_Y)
+    CP 2
+    JR NC,.SKIP
     LD A,C
     SUB (IX+E_X)              ; unsigned delta bulletX - enemyX
     JR C,.SKIP
@@ -826,17 +819,6 @@ RENDER_DRAW_ENEMIES:
     DJNZ .NEXT
     RET
 
-; IN: HL=screen address, IX=enemy, BC=field offset.
-; OUT: DE=slot background buffer. HL, BC, IX preserved.
-GET_ENEMY_BUFFER:
-    PUSH HL
-    PUSH IX
-    POP HL
-    ADD HL,BC
-    EX DE,HL
-    POP HL
-    RET
-
 ; Frame table order: small0, small1, large0, large1.
 ; OUT: DE=bitmap address. IX and BC preserved.
 GET_ENEMY_FRAME:
@@ -853,51 +835,75 @@ GET_ENEMY_FRAME:
     LD D,(HL)
     RET
 
-DRAW_ENEMY_SLOT:
+; -------------------------------------------------------------
+; Asteroids occupy two 8-pixel high character rows.
+; Direct bitmap copy, no saved background and no OR blending.
+; -------------------------------------------------------------
+
+; IN: A=0 top / 1 bottom, IX=enemy.
+; DESTROYS: AF, BC, DE, HL. PRESERVES: IX.
+DRAW_ENEMY_ROW:
+    PUSH AF
     LD B,(IX+E_Y)
+    ADD A,B
+    LD B,A
     LD C,(IX+E_X)
     CALL GET_SCREEN_ADDR
-    LD BC,E_BG_ATTR
-    CALL GET_ENEMY_BUFFER
+    POP AF
+    PUSH AF
+    PUSH HL
     LD A,(IX+E_TYPE)
     OR A
-    JR NZ,.SAVE_ATTR_2
-    CALL SAVE_ATTR_1_1
-    JR .SAVE_BITMAP
-.SAVE_ATTR_2:
-    CALL SAVE_ATTR_1_2
-.SAVE_BITMAP:
-    LD BC,E_BG_BITMAP
-    CALL GET_ENEMY_BUFFER
-    LD A,(IX+E_TYPE)
-    OR A
-    JR NZ,.SAVE_BITMAP_2
-    CALL SAVE_BITMAP_1_1
-    JR .ATTR
-.SAVE_BITMAP_2:
-    CALL SAVE_BITMAP_1_2
-.ATTR:
-    LD A,(IX+E_TYPE)
-    OR A
-    JR NZ,.ATTR_2
+    JR NZ,.ATTR_WIDE
     LD DE,ENEMY_ATTR_SMALL
     CALL RESTORE_ATTR_1_1
     JR .SPRITE
-.ATTR_2:
+.ATTR_WIDE:
     LD DE,ENEMY_ATTR_LARGE
     CALL RESTORE_ATTR_1_2
 .SPRITE:
+    POP HL
     PUSH HL
     CALL GET_ENEMY_FRAME
     POP HL
+    POP AF
+    OR A
+    JR Z,.DRAW
+    PUSH HL
     LD A,(IX+E_TYPE)
     OR A
-    JR NZ,.DRAW_2
-    CALL DRAW_1_1_BLENDED
-    JR .DONE
-.DRAW_2:
-    CALL DRAW_1_2_BLENDED
-.DONE:
+    LD BC,8
+    JR Z,.FRAME_OFFSET
+    LD BC,16
+.FRAME_OFFSET:
+    EX DE,HL
+    ADD HL,BC
+    EX DE,HL
+    POP HL
+.DRAW:
+    LD A,(IX+E_TYPE)
+    OR A
+    JP Z,DRAW_1_1
+    JP DRAW_1_2
+
+; IN: A=0 top / 1 bottom, IX=enemy.
+; Clears last-drawn cell row, including attribute.
+ERASE_ENEMY_ROW:
+    LD B,(IX+E_DRAW_Y)
+    ADD A,B
+    LD B,A
+    LD C,(IX+E_DRAW_X)
+    CALL GET_SCREEN_ADDR
+    LD A,(IX+E_TYPE)
+    OR A
+    JP Z,CLEAR_CELL_1_1
+    JP CLEAR_CELL_1_2
+
+DRAW_ENEMY_SLOT:
+    XOR A
+    CALL DRAW_ENEMY_ROW
+    LD A,1
+    CALL DRAW_ENEMY_ROW
     LD A,(IX+E_X)
     LD (IX+E_DRAW_X),A
     LD A,(IX+E_Y)
@@ -907,40 +913,28 @@ DRAW_ENEMY_SLOT:
     RET
 
 ERASE_ENEMY_SLOT:
-    LD B,(IX+E_DRAW_Y)
-    LD C,(IX+E_DRAW_X)
-    CALL GET_SCREEN_ADDR
-    LD BC,E_BG_ATTR
-    CALL GET_ENEMY_BUFFER
-    LD A,(IX+E_TYPE)
-    OR A
-    JR NZ,.ATTR_2
-    CALL RESTORE_ATTR_1_1
-    JR .BITMAP
-.ATTR_2:
-    CALL RESTORE_ATTR_1_2
-.BITMAP:
-    LD BC,E_BG_BITMAP
-    CALL GET_ENEMY_BUFFER
-    LD A,(IX+E_TYPE)
-    OR A
-    JR NZ,.BITMAP_2
-    CALL DRAW_1_1
-    JR .DONE
-.BITMAP_2:
-    CALL DRAW_1_2
-.DONE:
+    XOR A
+    CALL ERASE_ENEMY_ROW
+    LD A,1
+    CALL ERASE_ENEMY_ROW
     XOR A
     LD (IX+E_DRAWN),A
     RET
 
 ; ===== renderer.asm =====
 ; -------------------------------------------------------------
-; Independent dirty flags, two passes:
-;   1) Restore old backgrounds of ALL modified objects.
-;   2) Save the new backgrounds and draw only modified objects.
-; Non-overlap of game objects is enforced by game logic.
-; Background scroll will be inserted BETWEEN these passes later.
+; Selective two-pass rendering, opaque object sprites.
+;
+; All changed objects are first erased to the corridor base
+; attributes/bitmap, then their new pictures are drawn.
+; No bitmap save/restore per object.
+;
+; DIRTY is set on movement, animation tick, damage, spawning or
+; deactivation; it remains clear for an unchanged object.
+;
+; When moving stars are added later, their changed character cells
+; will mark intersecting objects DIRTY, before rendering, so stars
+; never punch through stationary opaque sprites.
 ; -------------------------------------------------------------
 RENDER_FRAME:
     CALL RENDER_ERASE_BULLETS
@@ -964,8 +958,8 @@ RENDER_FRAME:
     XOR A
     LD (BLAST_DRAWN),A
 .BLAST_ERASE_DONE:
-    ; Next stage: update moving background here, while sprites
-    ; whose old positions were affected have been erased.
+    ; Future starfield update belongs here.
+    ; Background changes must mark overlapping objects DIRTY.
 
     LD A,(BLAST_DIRTY)
     OR A
@@ -995,7 +989,7 @@ RENDER_FRAME:
 
 ; ===== graphics.asm =====
 ; -------------------------------------------------------------
-; Graphics primitives (screen address, 8x8 and 16x8 bitmap/attrs).
+; Opaque bitmap drawing: 8x8 / 16x8, attribute writes and clear.
 ; -------------------------------------------------------------
 GET_SCREEN_ADDR: ; IN: BC=YX, OUT: HL=ADDR
     LD A,B
@@ -1043,67 +1037,6 @@ RESTORE_ATTR_1_2:   ; IN: HL=ADDR (SAVED), DE=ATTR ADDR
     POP HL
     RET
 
-SAVE_ATTR_1_1:
-    PUSH HL
-    LD A,H
-    RRCA
-    RRCA
-    RRCA
-    AND 3
-    OR #58
-    LD H,A
-    LD A,(HL)
-    LD (DE),A
-    POP HL
-    RET
-
-SAVE_ATTR_1_2:
-    PUSH HL
-    LD A,H
-    RRCA
-    RRCA
-    RRCA
-    AND 3
-    OR #58
-    LD H,A
-    LD A,(HL)
-    LD (DE),A
-    INC L
-    INC DE
-    LD A,(HL)
-    LD (DE),A
-    POP HL
-    RET
-
-SAVE_BITMAP_1_1:
-    LD B,8
-    PUSH HL
-LOOP_SAVE_BITMAP_1_1:
-    LD A,(HL)
-    LD (DE),A
-    INC H
-    INC DE
-    DJNZ LOOP_SAVE_BITMAP_1_1
-    POP HL
-    RET
-
-SAVE_BITMAP_1_2:
-    LD B,8
-    PUSH HL
-LOOP_SAVE_BITMAP_1_2:
-    LD A,(HL)
-    LD (DE),A
-    INC L
-    INC DE
-    LD A,(HL)
-    LD (DE),A
-    DEC L
-    INC H
-    INC DE
-    DJNZ LOOP_SAVE_BITMAP_1_2
-    POP HL
-    RET
-
 DRAW_1_1:
     LD B,8
 LOOP_DRAW_1_1:
@@ -1129,87 +1062,87 @@ LOOP_DRAW_1_2:
     DJNZ LOOP_DRAW_1_2
     RET
     
-DRAW_1_2_BLENDED:
-    LD B,8
+; -------------------------------------------------------------
+; Clear old opaque sprite footprints WITHOUT saving the backdrop.
+; Call on old coordinates before drawing moving background dots.
+; IN: HL = top-left bitmap address of 8x8 or 16x8 cell area.
+; OUT: bitmap bytes = 0; attrs reset to corridor BG_ATTR.
+; DESTROYS AF,BC,DE; PRESERVES HL.
+; -------------------------------------------------------------
+CLEAR_CELL_1_1:
+    LD DE,BG_ATTR
+    CALL RESTORE_ATTR_1_1
     PUSH HL
-LOOP_DRAW_1_2_BLENDED:
-    LD A,(DE)
-    OR (HL) ; OR-BLEND
+    LD B,8
+    XOR A
+.LOOP:
+    LD (HL),A
+    INC H
+    DJNZ .LOOP
+    POP HL
+    RET
+
+CLEAR_CELL_1_2:
+    LD DE,BG_ATTR_PAIR
+    CALL RESTORE_ATTR_1_2
+    PUSH HL
+    LD B,8
+    XOR A
+.LOOP:
     LD (HL),A
     INC L
-    INC DE
-    LD A,(DE)
-    OR (HL) ; OR-BLEND
     LD (HL),A
     DEC L
     INC H
-    INC DE
-    DJNZ LOOP_DRAW_1_2_BLENDED
-    POP HL
-    RET
-    
-DRAW_1_1_BLENDED:
-    LD B,8
-    PUSH HL
-LOOP_DRAW_1_1_BLENDED:
-    LD A,(DE)
-    OR (HL) ; OR-BLEND
-    LD (HL),A
-    INC H
-    INC DE
-    DJNZ LOOP_DRAW_1_1_BLENDED
+    DJNZ .LOOP
     POP HL
     RET
 
 ; ===== objects.asm =====
 ; -------------------------------------------------------------
-; Object drawing: save underlying pixels + attributes, then draw.
+; Game objects are opaque. No backdrop saving or OR blending.
+; The old picture is erased to empty corridor cells, the moving
+; starfield will be drawn next, and then active objects drawn.
 ; -------------------------------------------------------------
-DRAW_BLAST:
-    LD BC,(BLAST_POS)
-    CALL GET_SCREEN_ADDR
-    LD DE,BLAST_BG_ATTR
-    CALL SAVE_ATTR_1_2
-    LD DE,BLAST_BG_BITMAP
-    CALL SAVE_BITMAP_1_2
-    LD DE,BLAST_ATTR
-    CALL RESTORE_ATTR_1_2
-    LD DE,(BLAST_FRAME_PTR)
-    CALL DRAW_1_2_BLENDED
-    RET
 
 DRAW_SHIP:
     LD BC,(SHIP_NEW_POS)
     CALL GET_SCREEN_ADDR
-    LD DE,SHIP_BG_ATTR
-    CALL SAVE_ATTR_1_2
-    LD DE,SHIP_BG_BITMAP
-    CALL SAVE_BITMAP_1_2
     LD DE,SHIP_ATTR
     CALL RESTORE_ATTR_1_2
     LD DE,SHIP_SPRITE
-    CALL DRAW_1_2_BLENDED
-    RET
-
-; Bullet drawing/erasing lives in bullets.asm (one slot at IX).
+    JP DRAW_1_2
 
 ERASE_SHIP:
     LD BC,(SHIP_CUR_POS)
     CALL GET_SCREEN_ADDR
-    LD DE,SHIP_BG_ATTR
+    JP CLEAR_CELL_1_2
+
+; Small explosion: 1x1 (8x8); large: 1x2 (16x8).
+; Both use the original asteroid top-left Y with no offset.
+DRAW_BLAST:
+    LD BC,(BLAST_POS)
+    CALL GET_SCREEN_ADDR
+    LD A,(BLAST_TYPE)
+    OR A
+    JR NZ,.WIDE
+    LD DE,BLAST_ATTR_SMALL
+    CALL RESTORE_ATTR_1_1
+    LD DE,(BLAST_FRAME_PTR)
+    JP DRAW_1_1
+.WIDE:
+    LD DE,BLAST_ATTR
     CALL RESTORE_ATTR_1_2
-    LD DE,SHIP_BG_BITMAP
-    CALL DRAW_1_2
-    RET
+    LD DE,(BLAST_FRAME_PTR)
+    JP DRAW_1_2
 
 ERASE_BLAST:
     LD BC,(BLAST_POS)
     CALL GET_SCREEN_ADDR
-    LD DE,BLAST_BG_ATTR
-    CALL RESTORE_ATTR_1_2
-    LD DE,BLAST_BG_BITMAP
-    CALL DRAW_1_2
-    RET
+    LD A,(BLAST_TYPE)
+    OR A
+    JP Z,CLEAR_CELL_1_1
+    JP CLEAR_CELL_1_2
 
 ; Clear screen only: all game objects are drawn by RENDER_FRAME.
 CLEAR_BITMAP:
@@ -1400,6 +1333,8 @@ DRAW_CHAR_AT:
 ; -------------------------------------------------------------
 BG_ATTR:
     DB #47                     ; bright white on black; corridor only
+BG_ATTR_PAIR:
+    DB #47,#47                 ; default attributes for 2-cell clear
 
 SHIP_START_POS:
     DB 15,22
@@ -1421,20 +1356,17 @@ SHIP_NEW_POS:
     DB 15,22                   ; logical target
 SHIP_DRAWN:
     DB 0
-SHIP_BG_ATTR:
-    DS 2,0
-SHIP_BG_BITMAP:
-    DS 16,0
 
 SHIP_HP:
     DB 100                      ; 100 -> 75 -> 50 -> 25 -> 0
 
 ; Four fixed lanes; no two enemies intersect horizontally.
 ENEMY_START_TABLE:
-    DB 0,8,2                    ; small asteroid, left
-    DB 1,12,11                  ; large asteroid, mid-left
-    DB 0,19,5                   ; small asteroid, mid-right
-    DB 1,23,16                  ; large asteroid, right
+    ; TYPE, X, Y, initial animation timer (1..4).
+    DB 0,8,2,1                  ; small, phase 1
+    DB 1,12,11,2                ; large, phase 2
+    DB 0,19,5,3                 ; small, phase 3
+    DB 1,23,16,4                ; large, phase 4
 
 ENEMY_MOVE_TIMER:
     DB 4
@@ -1453,45 +1385,79 @@ ENEMY_FRAMES:
     DW ENEMY_SMALL_0,ENEMY_SMALL_1
     DW ENEMY_LARGE_0,ENEMY_LARGE_1
 
+; Every frame is two character rows high (top then bottom).
+; Small frame: 16 bytes = 1x2. Large frame: 32 bytes = 2x2.
 ENEMY_SMALL_0:
+    DB %00000000
     DB %00011000
     DB %00111100
     DB %01111110
-    DB %11101111
-    DB %11111111
     DB %01110110
+    DB %11111111
+    DB %11011111
+    DB %11110111
+    DB %11111111
+    DB %11101111
+    DB %01111110
+    DB %01111010
+    DB %00111100
     DB %00111100
     DB %00011000
+    DB %00000000
 
 ENEMY_SMALL_1:
-    DB %00110000
-    DB %01111000
-    DB %11111100
-    DB %11111010
-    DB %01111111
-    DB %00111011
-    DB %00011110
+    DB %00000000
     DB %00001100
+    DB %00111110
+    DB %01111110
+    DB %01101111
+    DB %11111111
+    DB %11110111
+    DB %11011111
+    DB %11111110
+    DB %11101110
+    DB %01111110
+    DB %01011100
+    DB %00111100
+    DB %00011100
+    DB %00011000
+    DB %00000000
 
 ENEMY_LARGE_0:
-    DB #03,#C0
-    DB #0F,#F0
-    DB #3F,#FC
-    DB #7B,#DE
+    DB #00,#00
+    DB #00,#C0
+    DB #03,#F0
+    DB #0F,#FC
+    DB #1F,#FE
+    DB #3F,#FF
+    DB #7F,#FF
+    DB #7B,#EF
     DB #FF,#FF
-    DB #ED,#B7
+    DB #EF,#BF
+    DB #FF,#FF
     DB #7F,#FE
+    DB #3F,#FC
     DB #1F,#F8
+    DB #07,#E0
+    DB #01,#80
 
 ENEMY_LARGE_1:
+    DB #00,#00
+    DB #01,#80
     DB #07,#E0
     DB #1F,#F8
+    DB #3F,#FC
     DB #7F,#FE
-    DB #DF,#FB
     DB #FF,#FF
-    DB #B7,#ED
+    DB #FD,#DF
+    DB #F7,#EF
+    DB #FF,#FF
+    DB #FB,#DF
+    DB #7F,#FE
     DB #3F,#FC
     DB #0F,#F0
+    DB #03,#C0
+    DB #00,#00
 
 BULLET_COUNT:
     DB 0                        ; active bullets (0..6)
@@ -1514,20 +1480,60 @@ BLAST_ACTIVE:
     DB 0
 BLAST_DRAWN:
     DB 0
+BLAST_TYPE:
+    DB 0                        ; 0=8x8 for small, 1=16x8 for large
 BLAST_FRAME:
     DB 0
 BLAST_ANIM_TIMER:
     DB BLAST_FRAME_DURATION
 BLAST_POS:
-    DB 0,0
+    DB 0,0                      ; original asteroid X/Y, NO offset
 BLAST_FRAME_PTR:
     DW BLAST_FRAME_0
-BLAST_BG_ATTR:
-    DS 2,0
-BLAST_BG_BITMAP:
-    DS 16,0
+BLAST_ATTR_SMALL:
+    DB #07
 BLAST_ATTR:
     DB #07,#07
+BLAST_SMALL_FRAMES:
+    DW BLAST_SMALL_0,BLAST_SMALL_1,BLAST_SMALL_2,BLAST_SMALL_3
+
+BLAST_SMALL_0:
+    DB %00000000
+    DB %00000000
+    DB %00011000
+    DB %00111100
+    DB %00111100
+    DB %00011000
+    DB %00000000
+    DB %00000000
+BLAST_SMALL_1:
+    DB %00000000
+    DB %01011010
+    DB %00111100
+    DB %01111110
+    DB %01111110
+    DB %00111100
+    DB %01011010
+    DB %00000000
+BLAST_SMALL_2:
+    DB %10000001
+    DB %00100100
+    DB %00011000
+    DB %01000010
+    DB %01000010
+    DB %00011000
+    DB %00100100
+    DB %10000001
+BLAST_SMALL_3:
+    DB %00000000
+    DB %01000010
+    DB %00000000
+    DB %00010000
+    DB %00001000
+    DB %00000000
+    DB %01000010
+    DB %00000000
+
 BLAST_FRAMES:
     DW BLAST_FRAME_0,BLAST_FRAME_1,BLAST_FRAME_2,BLAST_FRAME_3
 

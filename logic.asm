@@ -110,7 +110,7 @@ UPDATE_GAME:
     RET
 
 ; Start an explosion at a destroyed asteroid (one effect slot).
-; IN: IX = asteroid slot. PRESERVES: IX. DESTROYS: AF, HL.
+; IN: IX = asteroid slot. PRESERVES: IX. DESTROYS: AF, DE, HL.
 START_ENEMY_BLAST:
     LD A,(BLAST_ACTIVE)
     OR A
@@ -121,10 +121,11 @@ START_ENEMY_BLAST:
     LD L,(IX+E_X)
     LD H,(IX+E_Y)
     LD (BLAST_POS),HL
-    LD HL,BLAST_FRAME_0
-    LD (BLAST_FRAME_PTR),HL
+    LD A,(IX+E_TYPE)
+    LD (BLAST_TYPE),A           ; 0=8x8, 1=16x8 explosion
     XOR A
     LD (BLAST_FRAME),A
+    CALL SELECT_BLAST_FRAME
     LD A,BLAST_FRAME_DURATION
     LD (BLAST_ANIM_TIMER),A
     LD A,1
@@ -170,7 +171,12 @@ SELECT_BLAST_FRAME:
     ADD A,A
     LD E,A
     LD D,0
+    LD A,(BLAST_TYPE)
+    OR A
+    LD HL,BLAST_SMALL_FRAMES
+    JR Z,.HAVE_TABLE
     LD HL,BLAST_FRAMES
+.HAVE_TABLE:
     ADD HL,DE
     LD E,(HL)
     INC HL

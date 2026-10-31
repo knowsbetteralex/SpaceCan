@@ -1,12 +1,12 @@
 ; -------------------------------------------------------------
-; ENEMIES: four independent asteroids (8x8 and 16x8).
+; ENEMIES: four independent asteroids (8x16 and 16x16).
 ;
 ; IX -> current enemy slot in all *_ENEMY_SLOT routines.
-; Four fixed lanes never overlap each other or static STAR.
+; Four fixed lanes never overlap each other.
 ; Game logic updates state/dirty; renderer stores drawn position.
 ; -------------------------------------------------------------
 
-; Initialise four slots from ENEMY_START_TABLE: TYPE, X, Y.
+; Initialise four slots from ENEMY_START_TABLE: TYPE, X, Y, PHASE.
 INIT_ENEMIES:
     ; Reset all slot states even when game is restarted.
     LD HL,ENEMY_POOL
@@ -37,8 +37,11 @@ INIT_ENEMIES:
     LD A,1
     LD (IX+E_ACTIVE),A
     LD (IX+E_DIRTY),A
-    LD A,ENEMY_FRAME_DELAY
+    ; Stagger the four independent animation timers (1..4).
+    LD A,(HL)
     LD (IX+E_ANIM_TIMER),A
+    LD (IX+E_PHASE),A
+    INC HL
     LD DE,ENEMY_SLOT_SIZE
     ADD IX,DE
     DJNZ .NEXT
@@ -127,7 +130,7 @@ UPDATE_ENEMY_SLOT:
     LD (IX+E_HP),A
     XOR A
     LD (IX+E_FRAME),A
-    LD A,ENEMY_FRAME_DELAY
+    LD A,(IX+E_PHASE)
     LD (IX+E_ANIM_TIMER),A
     LD A,1
     LD (IX+E_ACTIVE),A
@@ -181,9 +184,11 @@ CHECK_SHIP_ENEMY_SLOT:
     LD A,(IX+E_ACTIVE)
     OR A
     RET Z
+    ; Ship may touch the top or bottom asteroid cell row.
     LD A,(SHIP_NEW_POS+1)
-    CP (IX+E_Y)
-    RET NZ
+    SUB (IX+E_Y)
+    CP 2
+    RET NC
     LD A,(SHIP_NEW_POS)
     LD C,A                       ; ship left column
     LD A,(IX+E_X)
@@ -223,9 +228,11 @@ CHECK_BULLET_ENEMIES:
     LD A,(IX+E_ACTIVE)
     OR A
     JR Z,.SKIP
-    LD A,(IX+E_Y)
-    CP B
-    JR NZ,.SKIP
+    ; Compare both cell rows Y and Y+1, without tunnelling.
+    LD A,B
+    SUB (IX+E_Y)
+    CP 2
+    JR NC,.SKIP
     LD A,C
     SUB (IX+E_X)              ; unsigned delta bulletX - enemyX
     JR C,.SKIP
@@ -292,17 +299,6 @@ RENDER_DRAW_ENEMIES:
     DJNZ .NEXT
     RET
 
-; IN: HL=screen address, IX=enemy, BC=field offset.
-; OUT: DE=slot background buffer. HL, BC, IX preserved.
-GET_ENEMY_BUFFER:
-    PUSH HL
-    PUSH IX
-    POP HL
-    ADD HL,BC
-    EX DE,HL
-    POP HL
-    RET
-
 ; Frame table order: small0, small1, large0, large1.
 ; OUT: DE=bitmap address. IX and BC preserved.
 GET_ENEMY_FRAME:
@@ -319,51 +315,75 @@ GET_ENEMY_FRAME:
     LD D,(HL)
     RET
 
-DRAW_ENEMY_SLOT:
+; -------------------------------------------------------------
+; Asteroids occupy two 8-pixel high character rows.
+; Direct bitmap copy, no saved background and no OR blending.
+; -------------------------------------------------------------
+
+; IN: A=0 top / 1 bottom, IX=enemy.
+; DESTROYS: AF, BC, DE, HL. PRESERVES: IX.
+DRAW_ENEMY_ROW:
+    PUSH AF
     LD B,(IX+E_Y)
+    ADD A,B
+    LD B,A
     LD C,(IX+E_X)
     CALL GET_SCREEN_ADDR
-    LD BC,E_BG_ATTR
-    CALL GET_ENEMY_BUFFER
+    POP AF
+    PUSH AF
+    PUSH HL
     LD A,(IX+E_TYPE)
     OR A
-    JR NZ,.SAVE_ATTR_2
-    CALL SAVE_ATTR_1_1
-    JR .SAVE_BITMAP
-.SAVE_ATTR_2:
-    CALL SAVE_ATTR_1_2
-.SAVE_BITMAP:
-    LD BC,E_BG_BITMAP
-    CALL GET_ENEMY_BUFFER
-    LD A,(IX+E_TYPE)
-    OR A
-    JR NZ,.SAVE_BITMAP_2
-    CALL SAVE_BITMAP_1_1
-    JR .ATTR
-.SAVE_BITMAP_2:
-    CALL SAVE_BITMAP_1_2
-.ATTR:
-    LD A,(IX+E_TYPE)
-    OR A
-    JR NZ,.ATTR_2
+    JR NZ,.ATTR_WIDE
     LD DE,ENEMY_ATTR_SMALL
     CALL RESTORE_ATTR_1_1
     JR .SPRITE
-.ATTR_2:
+.ATTR_WIDE:
     LD DE,ENEMY_ATTR_LARGE
     CALL RESTORE_ATTR_1_2
 .SPRITE:
+    POP HL
     PUSH HL
     CALL GET_ENEMY_FRAME
     POP HL
+    POP AF
+    OR A
+    JR Z,.DRAW
+    PUSH HL
     LD A,(IX+E_TYPE)
     OR A
-    JR NZ,.DRAW_2
-    CALL DRAW_1_1_BLENDED
-    JR .DONE
-.DRAW_2:
-    CALL DRAW_1_2_BLENDED
-.DONE:
+    LD BC,8
+    JR Z,.FRAME_OFFSET
+    LD BC,16
+.FRAME_OFFSET:
+    EX DE,HL
+    ADD HL,BC
+    EX DE,HL
+    POP HL
+.DRAW:
+    LD A,(IX+E_TYPE)
+    OR A
+    JP Z,DRAW_1_1
+    JP DRAW_1_2
+
+; IN: A=0 top / 1 bottom, IX=enemy.
+; Clears last-drawn cell row, including attribute.
+ERASE_ENEMY_ROW:
+    LD B,(IX+E_DRAW_Y)
+    ADD A,B
+    LD B,A
+    LD C,(IX+E_DRAW_X)
+    CALL GET_SCREEN_ADDR
+    LD A,(IX+E_TYPE)
+    OR A
+    JP Z,CLEAR_CELL_1_1
+    JP CLEAR_CELL_1_2
+
+DRAW_ENEMY_SLOT:
+    XOR A
+    CALL DRAW_ENEMY_ROW
+    LD A,1
+    CALL DRAW_ENEMY_ROW
     LD A,(IX+E_X)
     LD (IX+E_DRAW_X),A
     LD A,(IX+E_Y)
@@ -373,29 +393,10 @@ DRAW_ENEMY_SLOT:
     RET
 
 ERASE_ENEMY_SLOT:
-    LD B,(IX+E_DRAW_Y)
-    LD C,(IX+E_DRAW_X)
-    CALL GET_SCREEN_ADDR
-    LD BC,E_BG_ATTR
-    CALL GET_ENEMY_BUFFER
-    LD A,(IX+E_TYPE)
-    OR A
-    JR NZ,.ATTR_2
-    CALL RESTORE_ATTR_1_1
-    JR .BITMAP
-.ATTR_2:
-    CALL RESTORE_ATTR_1_2
-.BITMAP:
-    LD BC,E_BG_BITMAP
-    CALL GET_ENEMY_BUFFER
-    LD A,(IX+E_TYPE)
-    OR A
-    JR NZ,.BITMAP_2
-    CALL DRAW_1_1
-    JR .DONE
-.BITMAP_2:
-    CALL DRAW_1_2
-.DONE:
+    XOR A
+    CALL ERASE_ENEMY_ROW
+    LD A,1
+    CALL ERASE_ENEMY_ROW
     XOR A
     LD (IX+E_DRAWN),A
     RET

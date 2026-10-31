@@ -3,6 +3,8 @@
 ; -------------------------------------------------------------
 BG_ATTR:
     DB #47                     ; bright white on black; corridor only
+BG_ATTR_PAIR:
+    DB #47,#47                 ; default attributes for 2-cell clear
 
 SHIP_START_POS:
     DB 15,22
@@ -24,20 +26,17 @@ SHIP_NEW_POS:
     DB 15,22                   ; logical target
 SHIP_DRAWN:
     DB 0
-SHIP_BG_ATTR:
-    DS 2,0
-SHIP_BG_BITMAP:
-    DS 16,0
 
 SHIP_HP:
     DB 100                      ; 100 -> 75 -> 50 -> 25 -> 0
 
 ; Four fixed lanes; no two enemies intersect horizontally.
 ENEMY_START_TABLE:
-    DB 0,8,2                    ; small asteroid, left
-    DB 1,12,11                  ; large asteroid, mid-left
-    DB 0,19,5                   ; small asteroid, mid-right
-    DB 1,23,16                  ; large asteroid, right
+    ; TYPE, X, Y, initial animation timer (1..4).
+    DB 0,8,2,1                  ; small, phase 1
+    DB 1,12,11,2                ; large, phase 2
+    DB 0,19,5,3                 ; small, phase 3
+    DB 1,23,16,4                ; large, phase 4
 
 ENEMY_MOVE_TIMER:
     DB 4
@@ -56,45 +55,79 @@ ENEMY_FRAMES:
     DW ENEMY_SMALL_0,ENEMY_SMALL_1
     DW ENEMY_LARGE_0,ENEMY_LARGE_1
 
+; Every frame is two character rows high (top then bottom).
+; Small frame: 16 bytes = 1x2. Large frame: 32 bytes = 2x2.
 ENEMY_SMALL_0:
+    DB %00000000
     DB %00011000
     DB %00111100
     DB %01111110
-    DB %11101111
-    DB %11111111
     DB %01110110
+    DB %11111111
+    DB %11011111
+    DB %11110111
+    DB %11111111
+    DB %11101111
+    DB %01111110
+    DB %01111010
+    DB %00111100
     DB %00111100
     DB %00011000
+    DB %00000000
 
 ENEMY_SMALL_1:
-    DB %00110000
-    DB %01111000
-    DB %11111100
-    DB %11111010
-    DB %01111111
-    DB %00111011
-    DB %00011110
+    DB %00000000
     DB %00001100
+    DB %00111110
+    DB %01111110
+    DB %01101111
+    DB %11111111
+    DB %11110111
+    DB %11011111
+    DB %11111110
+    DB %11101110
+    DB %01111110
+    DB %01011100
+    DB %00111100
+    DB %00011100
+    DB %00011000
+    DB %00000000
 
 ENEMY_LARGE_0:
-    DB #03,#C0
-    DB #0F,#F0
-    DB #3F,#FC
-    DB #7B,#DE
+    DB #00,#00
+    DB #00,#C0
+    DB #03,#F0
+    DB #0F,#FC
+    DB #1F,#FE
+    DB #3F,#FF
+    DB #7F,#FF
+    DB #7B,#EF
     DB #FF,#FF
-    DB #ED,#B7
+    DB #EF,#BF
+    DB #FF,#FF
     DB #7F,#FE
+    DB #3F,#FC
     DB #1F,#F8
+    DB #07,#E0
+    DB #01,#80
 
 ENEMY_LARGE_1:
+    DB #00,#00
+    DB #01,#80
     DB #07,#E0
     DB #1F,#F8
+    DB #3F,#FC
     DB #7F,#FE
-    DB #DF,#FB
     DB #FF,#FF
-    DB #B7,#ED
+    DB #FD,#DF
+    DB #F7,#EF
+    DB #FF,#FF
+    DB #FB,#DF
+    DB #7F,#FE
     DB #3F,#FC
     DB #0F,#F0
+    DB #03,#C0
+    DB #00,#00
 
 BULLET_COUNT:
     DB 0                        ; active bullets (0..6)
@@ -117,20 +150,60 @@ BLAST_ACTIVE:
     DB 0
 BLAST_DRAWN:
     DB 0
+BLAST_TYPE:
+    DB 0                        ; 0=8x8 for small, 1=16x8 for large
 BLAST_FRAME:
     DB 0
 BLAST_ANIM_TIMER:
     DB BLAST_FRAME_DURATION
 BLAST_POS:
-    DB 0,0
+    DB 0,0                      ; original asteroid X/Y, NO offset
 BLAST_FRAME_PTR:
     DW BLAST_FRAME_0
-BLAST_BG_ATTR:
-    DS 2,0
-BLAST_BG_BITMAP:
-    DS 16,0
+BLAST_ATTR_SMALL:
+    DB #07
 BLAST_ATTR:
     DB #07,#07
+BLAST_SMALL_FRAMES:
+    DW BLAST_SMALL_0,BLAST_SMALL_1,BLAST_SMALL_2,BLAST_SMALL_3
+
+BLAST_SMALL_0:
+    DB %00000000
+    DB %00000000
+    DB %00011000
+    DB %00111100
+    DB %00111100
+    DB %00011000
+    DB %00000000
+    DB %00000000
+BLAST_SMALL_1:
+    DB %00000000
+    DB %01011010
+    DB %00111100
+    DB %01111110
+    DB %01111110
+    DB %00111100
+    DB %01011010
+    DB %00000000
+BLAST_SMALL_2:
+    DB %10000001
+    DB %00100100
+    DB %00011000
+    DB %01000010
+    DB %01000010
+    DB %00011000
+    DB %00100100
+    DB %10000001
+BLAST_SMALL_3:
+    DB %00000000
+    DB %01000010
+    DB %00000000
+    DB %00010000
+    DB %00001000
+    DB %00000000
+    DB %01000010
+    DB %00000000
+
 BLAST_FRAMES:
     DW BLAST_FRAME_0,BLAST_FRAME_1,BLAST_FRAME_2,BLAST_FRAME_3
 

@@ -1,5 +1,5 @@
 ; -------------------------------------------------------------
-; BULLET POOL (6 x 16 bytes)
+; BULLET POOL (6 x 8 bytes)
 ;
 ; A slot is reusable only when ACTIVE=0 and DRAWN=0.
 ; ACTIVE=0 free, 1 just spawned, 2 in flight.
@@ -112,6 +112,10 @@ CHECK_BULLET_COLLISION:
     LD A,(BLAST_POS)
     CP (IX+B_X)
     JR Z,.ABSORB
+    LD A,(BLAST_TYPE)
+    OR A
+    RET Z                       ; small explosion occupies only X
+    LD A,(BLAST_POS)
     INC A
     CP (IX+B_X)
     RET NZ
@@ -131,8 +135,8 @@ DEACTIVATE_BULLET:
     RET
 
 ; -------------------------------------------------------------
-; POOL RENDERING: two passes, shared with ship/star/blast.
-; Erase uses the last drawn coordinates, never the logical ones.
+; Selective bullet rendering. No saved background: erase old cell
+; to base corridor ink/paper, then draw active bullet opaque.
 ; -------------------------------------------------------------
 RENDER_ERASE_BULLETS:
     LD IX,BULLET_POOL
@@ -172,34 +176,15 @@ RENDER_DRAW_BULLETS:
     DJNZ .NEXT
     RET
 
-; IN: HL=screen address, IX=slot, BC=field offset (6/7).
-; OUT: DE=address of field within slot.
-; PRESERVES: HL, BC, IX. DESTROYS: DE.
-GET_BULLET_BUFFER:
-    PUSH HL
-    PUSH IX
-    POP HL
-    ADD HL,BC
-    EX DE,HL
-    POP HL
-    RET
-
-; Draw 8x8 bullet at logical position and save the background.
-; IX preserved; other registers may change.
+; IX preserved; all coordinates in character cells.
 DRAW_BULLET_SLOT:
     LD B,(IX+B_Y)
     LD C,(IX+B_X)
     CALL GET_SCREEN_ADDR
-    LD BC,B_BG_ATTR
-    CALL GET_BULLET_BUFFER
-    CALL SAVE_ATTR_1_1
-    LD BC,B_BG_BITMAP
-    CALL GET_BULLET_BUFFER
-    CALL SAVE_BITMAP_1_1
     LD DE,BULLET_ATTR
     CALL RESTORE_ATTR_1_1
     LD DE,BULLET_SPRITE
-    CALL DRAW_1_1_BLENDED
+    CALL DRAW_1_1
 
     LD A,(IX+B_X)
     LD (IX+B_DRAW_X),A
@@ -209,17 +194,11 @@ DRAW_BULLET_SLOT:
     LD (IX+B_DRAWN),A
     RET
 
-; Restore the saved background at the LAST DRAWN position.
 ERASE_BULLET_SLOT:
     LD B,(IX+B_DRAW_Y)
     LD C,(IX+B_DRAW_X)
     CALL GET_SCREEN_ADDR
-    LD BC,B_BG_ATTR
-    CALL GET_BULLET_BUFFER
-    CALL RESTORE_ATTR_1_1
-    LD BC,B_BG_BITMAP
-    CALL GET_BULLET_BUFFER
-    CALL DRAW_1_1
+    CALL CLEAR_CELL_1_1
     XOR A
     LD (IX+B_DRAWN),A
     RET

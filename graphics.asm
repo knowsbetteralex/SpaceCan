@@ -1,5 +1,5 @@
 ; -------------------------------------------------------------
-; Graphics primitives (screen address, 8x8 and 16x8 bitmap/attrs).
+; Opaque bitmap drawing: 8x8 / 16x8, attribute writes and clear.
 ; -------------------------------------------------------------
 GET_SCREEN_ADDR: ; IN: BC=YX, OUT: HL=ADDR
     LD A,B
@@ -47,67 +47,6 @@ RESTORE_ATTR_1_2:   ; IN: HL=ADDR (SAVED), DE=ATTR ADDR
     POP HL
     RET
 
-SAVE_ATTR_1_1:
-    PUSH HL
-    LD A,H
-    RRCA
-    RRCA
-    RRCA
-    AND 3
-    OR #58
-    LD H,A
-    LD A,(HL)
-    LD (DE),A
-    POP HL
-    RET
-
-SAVE_ATTR_1_2:
-    PUSH HL
-    LD A,H
-    RRCA
-    RRCA
-    RRCA
-    AND 3
-    OR #58
-    LD H,A
-    LD A,(HL)
-    LD (DE),A
-    INC L
-    INC DE
-    LD A,(HL)
-    LD (DE),A
-    POP HL
-    RET
-
-SAVE_BITMAP_1_1:
-    LD B,8
-    PUSH HL
-LOOP_SAVE_BITMAP_1_1:
-    LD A,(HL)
-    LD (DE),A
-    INC H
-    INC DE
-    DJNZ LOOP_SAVE_BITMAP_1_1
-    POP HL
-    RET
-
-SAVE_BITMAP_1_2:
-    LD B,8
-    PUSH HL
-LOOP_SAVE_BITMAP_1_2:
-    LD A,(HL)
-    LD (DE),A
-    INC L
-    INC DE
-    LD A,(HL)
-    LD (DE),A
-    DEC L
-    INC H
-    INC DE
-    DJNZ LOOP_SAVE_BITMAP_1_2
-    POP HL
-    RET
-
 DRAW_1_1:
     LD B,8
 LOOP_DRAW_1_1:
@@ -133,34 +72,38 @@ LOOP_DRAW_1_2:
     DJNZ LOOP_DRAW_1_2
     RET
     
-DRAW_1_2_BLENDED:
-    LD B,8
+; -------------------------------------------------------------
+; Clear old opaque sprite footprints WITHOUT saving the backdrop.
+; Call on old coordinates before drawing moving background dots.
+; IN: HL = top-left bitmap address of 8x8 or 16x8 cell area.
+; OUT: bitmap bytes = 0; attrs reset to corridor BG_ATTR.
+; DESTROYS AF,BC,DE; PRESERVES HL.
+; -------------------------------------------------------------
+CLEAR_CELL_1_1:
+    LD DE,BG_ATTR
+    CALL RESTORE_ATTR_1_1
     PUSH HL
-LOOP_DRAW_1_2_BLENDED:
-    LD A,(DE)
-    OR (HL) ; OR-BLEND
+    LD B,8
+    XOR A
+.LOOP:
+    LD (HL),A
+    INC H
+    DJNZ .LOOP
+    POP HL
+    RET
+
+CLEAR_CELL_1_2:
+    LD DE,BG_ATTR_PAIR
+    CALL RESTORE_ATTR_1_2
+    PUSH HL
+    LD B,8
+    XOR A
+.LOOP:
     LD (HL),A
     INC L
-    INC DE
-    LD A,(DE)
-    OR (HL) ; OR-BLEND
     LD (HL),A
     DEC L
     INC H
-    INC DE
-    DJNZ LOOP_DRAW_1_2_BLENDED
-    POP HL
-    RET
-    
-DRAW_1_1_BLENDED:
-    LD B,8
-    PUSH HL
-LOOP_DRAW_1_1_BLENDED:
-    LD A,(DE)
-    OR (HL) ; OR-BLEND
-    LD (HL),A
-    INC H
-    INC DE
-    DJNZ LOOP_DRAW_1_1_BLENDED
+    DJNZ .LOOP
     POP HL
     RET

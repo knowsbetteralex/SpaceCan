@@ -1,51 +1,47 @@
 ; -------------------------------------------------------------
-; Object drawing: save underlying pixels + attributes, then draw.
+; Game objects are opaque. No backdrop saving or OR blending.
+; The old picture is erased to empty corridor cells, the moving
+; starfield will be drawn next, and then active objects drawn.
 ; -------------------------------------------------------------
-DRAW_BLAST:
-    LD BC,(BLAST_POS)
-    CALL GET_SCREEN_ADDR
-    LD DE,BLAST_BG_ATTR
-    CALL SAVE_ATTR_1_2
-    LD DE,BLAST_BG_BITMAP
-    CALL SAVE_BITMAP_1_2
-    LD DE,BLAST_ATTR
-    CALL RESTORE_ATTR_1_2
-    LD DE,(BLAST_FRAME_PTR)
-    CALL DRAW_1_2_BLENDED
-    RET
 
 DRAW_SHIP:
     LD BC,(SHIP_NEW_POS)
     CALL GET_SCREEN_ADDR
-    LD DE,SHIP_BG_ATTR
-    CALL SAVE_ATTR_1_2
-    LD DE,SHIP_BG_BITMAP
-    CALL SAVE_BITMAP_1_2
     LD DE,SHIP_ATTR
     CALL RESTORE_ATTR_1_2
     LD DE,SHIP_SPRITE
-    CALL DRAW_1_2_BLENDED
-    RET
-
-; Bullet drawing/erasing lives in bullets.asm (one slot at IX).
+    JP DRAW_1_2
 
 ERASE_SHIP:
     LD BC,(SHIP_CUR_POS)
     CALL GET_SCREEN_ADDR
-    LD DE,SHIP_BG_ATTR
+    JP CLEAR_CELL_1_2
+
+; Small explosion: 1x1 (8x8); large: 1x2 (16x8).
+; Both use the original asteroid top-left Y with no offset.
+DRAW_BLAST:
+    LD BC,(BLAST_POS)
+    CALL GET_SCREEN_ADDR
+    LD A,(BLAST_TYPE)
+    OR A
+    JR NZ,.WIDE
+    LD DE,BLAST_ATTR_SMALL
+    CALL RESTORE_ATTR_1_1
+    LD DE,(BLAST_FRAME_PTR)
+    JP DRAW_1_1
+.WIDE:
+    LD DE,BLAST_ATTR
     CALL RESTORE_ATTR_1_2
-    LD DE,SHIP_BG_BITMAP
-    CALL DRAW_1_2
-    RET
+    LD DE,(BLAST_FRAME_PTR)
+    JP DRAW_1_2
 
 ERASE_BLAST:
     LD BC,(BLAST_POS)
     CALL GET_SCREEN_ADDR
-    LD DE,BLAST_BG_ATTR
-    CALL RESTORE_ATTR_1_2
-    LD DE,BLAST_BG_BITMAP
-    CALL DRAW_1_2
-    RET
+    LD A,(BLAST_TYPE)
+    OR A
+    JP Z,CLEAR_CELL_1_1
+    JP CLEAR_CELL_1_2
 
 ; Clear screen only: all game objects are drawn by RENDER_FRAME.
 CLEAR_BITMAP:
