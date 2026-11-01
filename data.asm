@@ -260,16 +260,6 @@ DIRTY_MAP:     DS 768,0
 DIRTY_QUEUE:   DS 320,0          ; 160 unique character cells
 
 STAR_POOL:
-    ; Nearest: 2*SCROLL_SPEED pixels each frame.
-    DB 7,20,#10,0
-    DB 10,90,#02,0
-    DB 14,156,#40,0
-    DB 18,28,#08,0
-    DB 22,124,#01,0
-    DB 25,180,#20,0
-    DB 12,64,#04,0
-    DB 20,104,#80,0
-
     ; Mid layer: SCROLL_SPEED pixels every two frames.
     DB 6,73,#10,1
     DB 9,150,#01,1
@@ -293,7 +283,7 @@ STAR_POOL:
 ; -------------------------------------------------------------
 ; Input and HUD state.
 ; -------------------------------------------------------------
-SCROLL_SPEED:      DB 1        ; 1..4, multiplier for stars and asteroid speed
+SCROLL_SPEED:      DB 1        ; 1..3, multiplier for stars and asteroid speed
 SCORE:             DB 0        ; demo score 0..99
 HUD_DIRTY:         DB 1        ; dynamic numeric labels need redraw
 SPACE_HELD:        DB 0        ; key edge detection

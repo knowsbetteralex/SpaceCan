@@ -1,18 +1,17 @@
 ; -------------------------------------------------------------
-; STARFIELD: 24 moving single-pixel stars, three parallax speeds.
+; STARFIELD: 16 moving single-pixel stars, two slower layers.
 ;
-; Logical state is a 4-byte array: X cell, Y pixel, bit mask, period.
-; Period 0: +2*speed px/frame, 1: +speed px/2 frames,
-; period 3: +speed px/4 frames. speed ranges from 1 to 4.
-; The dirty queue contains unique X/Y character cells only.
+; Record: X character cell, Y pixel, pixel bit mask, period mask.
+; Period 1: +speed pixels every 2 frames.
+; Period 3: +speed pixels every 4 frames. speed=1..3.
 ;
 ; Render order:
-;   1) mark any foreground object overlapping star-dirty cells;
-;   2) obsolete foreground positions add their cells to the queue;
-;   3) clear the dirty cells, then draw stars occupying them;
-;   4) redraw the foreground objects that changed.
-;
-; No background saving and no full-screen clearing.
+;   1) invalidate foreground sprites touched by star changes;
+;   2) add old foreground rectangles to the dirty-cell queue;
+;   3) clear each dirty cell once;
+;   4) draw changed opaque sprites;
+;   5) OR new stars LAST, even over asteroids (intended effect).
+; No saved background and no full-screen clearing.
 ; -------------------------------------------------------------
 
 S_X       EQU 0
@@ -20,7 +19,7 @@ S_Y       EQU 1
 S_MASK    EQU 2
 S_PERIOD  EQU 3
 STAR_SIZE EQU 4
-STAR_COUNT EQU 24
+STAR_COUNT EQU 16
 DIRTY_LIMIT EQU 160
 
 STARFIELD_INIT:
@@ -184,17 +183,12 @@ STARFIELD_UPDATE:
     JR NZ,.SKIP
 
     CALL STARFIELD_MARK_STAR  ; old character cell
-    ; Player-selected SCROLL_SPEED multiplies all layer speeds.
-    LD A,(SCROLL_SPEED)      ; 1..4 pixels per movement tick
+    ; Both remaining layers use the same pixel step (1..3).
+    ; S_PERIOD changes only how often the star takes that step.
+    LD A,(SCROLL_SPEED)
     LD C,A
-    LD A,(IX+S_PERIOD)
-    OR A
-    JR NZ,.STEP
-    SLA C                    ; near stars move 2x as fast
-.STEP:
     LD A,(IX+S_Y)
     ADD A,C
-.WRAP:
     CP 192
     JR C,.SAVE_Y
     SUB 176                  ; wrap into Y=16..191, preserve excess
@@ -298,9 +292,9 @@ STARFIELD_INVALIDATE_FOREGROUND:
     DJNZ .NEXT_ENEMY
     RET
 
-; Clear all dirty bitmap cells to corridor background.
-; Objects have already added their old footprints to the queue.
-STARFIELD_REFRESH_CELLS:
+; Stage 1: clear changed cells BEFORE drawing sprites.
+; DIRTY_MAP and DIRTY_QUEUE remain valid until the star pass finishes.
+STARFIELD_CLEAR_CELLS:
     LD A,(DIRTY_COUNT)
     OR A
     RET Z
@@ -316,8 +310,16 @@ STARFIELD_REFRESH_CELLS:
     INC IX
     POP BC
     DJNZ .CLEAR_NEXT
+    RET
 
-    ; Only plot stars located in dirty character cells.
+; Stage 2: plot current stars AFTER all foreground drawing.
+; An OR star may intentionally appear over an asteroid.
+; Reset the dirty queue only AFTER plotting all stars.
+STARFIELD_DRAW_STARS:
+    LD A,(DIRTY_COUNT)
+    OR A
+    RET Z
+
     LD IX,STAR_POOL
     LD B,STAR_COUNT
 .DRAW_NEXT:
@@ -336,7 +338,6 @@ STARFIELD_REFRESH_CELLS:
     ADD IX,DE
     DJNZ .DRAW_NEXT
 
-    ; Forget the touched cells; next frame starts with an empty queue.
     LD IX,DIRTY_QUEUE
     LD A,(DIRTY_COUNT)
     LD B,A
@@ -360,7 +361,7 @@ STARFIELD_REFRESH_CELLS:
 
 ; Draw one white star bit. Its Y is a PIXEL coordinate, not a row.
 ; IN IX=star. Uses only OR for background point composition.
-; Object sprites remain opaque and use direct bitmap writes.
+; Unlike opaque sprites, stars are intentionally OR'ed on top.
 STARFIELD_DRAW_STAR:
     LD A,(IX+S_Y)
     SRL A

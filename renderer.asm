@@ -1,19 +1,19 @@
 ; -------------------------------------------------------------
-; Selective renderer for an opaque foreground over moving stars.
+; Selective renderer, foreground first / stars last.
 ;
-; Old object footprints are queued as dirty character cells.
-; All queued cells are cleared and their star background reconstructed.
-; Changed objects are painted opaque over the reconstructed cells.
+; Dirty old object cells and moved star cells share the queue.
+; Clear these cells first, redraw changed opaque sprites next,
+; then add the moving star pixels as a final OR overlay.
 ;
 ; DIRTY is set on movement, animation tick, damage, spawning or
 ; deactivation; it remains clear for an unchanged object.
 ;
-; When moving stars are added later, their changed character cells
-; will mark intersecting objects DIRTY, before rendering, so stars
-; never punch through stationary opaque sprites.
+; Star changes still invalidate affected objects: cleaning an old
+; star cell must not punch a blank hole into a stationary sprite.
+; The final star itself MAY appear over the asteroid (by design).
 ; -------------------------------------------------------------
 RENDER_FRAME:
-    ; Star movement can invalidate otherwise stationary opaque objects.
+    ; A moved star may require restoring an otherwise static sprite.
     CALL STARFIELD_INVALIDATE_FOREGROUND
 
     ; Erase phase marks old footprints in the dirty-cell queue.
@@ -38,8 +38,8 @@ RENDER_FRAME:
     XOR A
     LD (BLAST_DRAWN),A
 .BLAST_ERASE_DONE:
-    ; One clear per dirty cell, then plot current stars in those cells.
-    CALL STARFIELD_REFRESH_CELLS
+    ; Clear each changed cell once, leaving foreground rendering next.
+    CALL STARFIELD_CLEAR_CELLS
 
     LD A,(BLAST_DIRTY)
     OR A
@@ -65,4 +65,8 @@ RENDER_FRAME:
     LD (SHIP_DRAWN),A
 .SHIP_DONE:
     CALL RENDER_DRAW_ENEMIES
-    JP RENDER_DRAW_BULLETS
+    CALL RENDER_DRAW_BULLETS
+
+    ; Final pass: OR star bits into the finished image, including
+    ; asteroid pixels when a star happens to cross one.
+    JP STARFIELD_DRAW_STARS

@@ -37,7 +37,7 @@ READ_SHIP_HORIZONTAL:
     LD (SHIP_DIRTY),A
     RET
 
-; Q/A change speed 1..4 for the HUD, asteroids and starfield.
+; Q/A change speed 1..3 for the HUD, asteroids and starfield.
 READ_SPEED_KEYS:
     LD BC,#FBFE
     IN A,(C)
@@ -49,7 +49,7 @@ READ_SPEED_KEYS:
     LD A,1
     LD (SPEED_UP_HELD),A
     LD A,(SCROLL_SPEED)
-    CP 4
+    CP 3
     JR Z,.CHECK_A
     INC A
     LD (SCROLL_SPEED),A

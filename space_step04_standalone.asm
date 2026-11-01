@@ -165,7 +165,7 @@ READ_SHIP_HORIZONTAL:
     LD (SHIP_DIRTY),A
     RET
 
-; Q/A change speed 1..4 for the HUD, asteroids and starfield.
+; Q/A change speed 1..3 for the HUD, asteroids and starfield.
 READ_SPEED_KEYS:
     LD BC,#FBFE
     IN A,(C)
@@ -177,7 +177,7 @@ READ_SPEED_KEYS:
     LD A,1
     LD (SPEED_UP_HELD),A
     LD A,(SCROLL_SPEED)
-    CP 4
+    CP 3
     JR Z,.CHECK_A
     INC A
     LD (SCROLL_SPEED),A
@@ -918,20 +918,19 @@ ERASE_ENEMY_SLOT:
 
 ; ===== starfield.asm =====
 ; -------------------------------------------------------------
-; STARFIELD: 24 moving single-pixel stars, three parallax speeds.
+; STARFIELD: 16 moving single-pixel stars, two slower layers.
 ;
-; Logical state is a 4-byte array: X cell, Y pixel, bit mask, period.
-; Period 0: +2*speed px/frame, 1: +speed px/2 frames,
-; period 3: +speed px/4 frames. speed ranges from 1 to 4.
-; The dirty queue contains unique X/Y character cells only.
+; Record: X character cell, Y pixel, pixel bit mask, period mask.
+; Period 1: +speed pixels every 2 frames.
+; Period 3: +speed pixels every 4 frames. speed=1..3.
 ;
 ; Render order:
-;   1) mark any foreground object overlapping star-dirty cells;
-;   2) obsolete foreground positions add their cells to the queue;
-;   3) clear the dirty cells, then draw stars occupying them;
-;   4) redraw the foreground objects that changed.
-;
-; No background saving and no full-screen clearing.
+;   1) invalidate foreground sprites touched by star changes;
+;   2) add old foreground rectangles to the dirty-cell queue;
+;   3) clear each dirty cell once;
+;   4) draw changed opaque sprites;
+;   5) OR new stars LAST, even over asteroids (intended effect).
+; No saved background and no full-screen clearing.
 ; -------------------------------------------------------------
 
 S_X       EQU 0
@@ -939,7 +938,7 @@ S_Y       EQU 1
 S_MASK    EQU 2
 S_PERIOD  EQU 3
 STAR_SIZE EQU 4
-STAR_COUNT EQU 24
+STAR_COUNT EQU 16
 DIRTY_LIMIT EQU 160
 
 STARFIELD_INIT:
@@ -1103,17 +1102,12 @@ STARFIELD_UPDATE:
     JR NZ,.SKIP
 
     CALL STARFIELD_MARK_STAR  ; old character cell
-    ; Player-selected SCROLL_SPEED multiplies all layer speeds.
-    LD A,(SCROLL_SPEED)      ; 1..4 pixels per movement tick
+    ; Both remaining layers use the same pixel step (1..3).
+    ; S_PERIOD changes only how often the star takes that step.
+    LD A,(SCROLL_SPEED)
     LD C,A
-    LD A,(IX+S_PERIOD)
-    OR A
-    JR NZ,.STEP
-    SLA C                    ; near stars move 2x as fast
-.STEP:
     LD A,(IX+S_Y)
     ADD A,C
-.WRAP:
     CP 192
     JR C,.SAVE_Y
     SUB 176                  ; wrap into Y=16..191, preserve excess
@@ -1217,9 +1211,9 @@ STARFIELD_INVALIDATE_FOREGROUND:
     DJNZ .NEXT_ENEMY
     RET
 
-; Clear all dirty bitmap cells to corridor background.
-; Objects have already added their old footprints to the queue.
-STARFIELD_REFRESH_CELLS:
+; Stage 1: clear changed cells BEFORE drawing sprites.
+; DIRTY_MAP and DIRTY_QUEUE remain valid until the star pass finishes.
+STARFIELD_CLEAR_CELLS:
     LD A,(DIRTY_COUNT)
     OR A
     RET Z
@@ -1235,8 +1229,16 @@ STARFIELD_REFRESH_CELLS:
     INC IX
     POP BC
     DJNZ .CLEAR_NEXT
+    RET
 
-    ; Only plot stars located in dirty character cells.
+; Stage 2: plot current stars AFTER all foreground drawing.
+; An OR star may intentionally appear over an asteroid.
+; Reset the dirty queue only AFTER plotting all stars.
+STARFIELD_DRAW_STARS:
+    LD A,(DIRTY_COUNT)
+    OR A
+    RET Z
+
     LD IX,STAR_POOL
     LD B,STAR_COUNT
 .DRAW_NEXT:
@@ -1255,7 +1257,6 @@ STARFIELD_REFRESH_CELLS:
     ADD IX,DE
     DJNZ .DRAW_NEXT
 
-    ; Forget the touched cells; next frame starts with an empty queue.
     LD IX,DIRTY_QUEUE
     LD A,(DIRTY_COUNT)
     LD B,A
@@ -1279,7 +1280,7 @@ STARFIELD_REFRESH_CELLS:
 
 ; Draw one white star bit. Its Y is a PIXEL coordinate, not a row.
 ; IN IX=star. Uses only OR for background point composition.
-; Object sprites remain opaque and use direct bitmap writes.
+; Unlike opaque sprites, stars are intentionally OR'ed on top.
 STARFIELD_DRAW_STAR:
     LD A,(IX+S_Y)
     SRL A
@@ -1299,21 +1300,21 @@ STARFIELD_DRAW_STAR:
 
 ; ===== renderer.asm =====
 ; -------------------------------------------------------------
-; Selective renderer for an opaque foreground over moving stars.
+; Selective renderer, foreground first / stars last.
 ;
-; Old object footprints are queued as dirty character cells.
-; All queued cells are cleared and their star background reconstructed.
-; Changed objects are painted opaque over the reconstructed cells.
+; Dirty old object cells and moved star cells share the queue.
+; Clear these cells first, redraw changed opaque sprites next,
+; then add the moving star pixels as a final OR overlay.
 ;
 ; DIRTY is set on movement, animation tick, damage, spawning or
 ; deactivation; it remains clear for an unchanged object.
 ;
-; When moving stars are added later, their changed character cells
-; will mark intersecting objects DIRTY, before rendering, so stars
-; never punch through stationary opaque sprites.
+; Star changes still invalidate affected objects: cleaning an old
+; star cell must not punch a blank hole into a stationary sprite.
+; The final star itself MAY appear over the asteroid (by design).
 ; -------------------------------------------------------------
 RENDER_FRAME:
-    ; Star movement can invalidate otherwise stationary opaque objects.
+    ; A moved star may require restoring an otherwise static sprite.
     CALL STARFIELD_INVALIDATE_FOREGROUND
 
     ; Erase phase marks old footprints in the dirty-cell queue.
@@ -1338,8 +1339,8 @@ RENDER_FRAME:
     XOR A
     LD (BLAST_DRAWN),A
 .BLAST_ERASE_DONE:
-    ; One clear per dirty cell, then plot current stars in those cells.
-    CALL STARFIELD_REFRESH_CELLS
+    ; Clear each changed cell once, leaving foreground rendering next.
+    CALL STARFIELD_CLEAR_CELLS
 
     LD A,(BLAST_DIRTY)
     OR A
@@ -1365,7 +1366,11 @@ RENDER_FRAME:
     LD (SHIP_DRAWN),A
 .SHIP_DONE:
     CALL RENDER_DRAW_ENEMIES
-    JP RENDER_DRAW_BULLETS
+    CALL RENDER_DRAW_BULLETS
+
+    ; Final pass: OR star bits into the finished image, including
+    ; asteroid pixels when a star happens to cross one.
+    JP STARFIELD_DRAW_STARS
 
 ; ===== graphics.asm =====
 ; -------------------------------------------------------------
@@ -1972,16 +1977,6 @@ DIRTY_MAP:     DS 768,0
 DIRTY_QUEUE:   DS 320,0          ; 160 unique character cells
 
 STAR_POOL:
-    ; Nearest: 2*SCROLL_SPEED pixels each frame.
-    DB 7,20,#10,0
-    DB 10,90,#02,0
-    DB 14,156,#40,0
-    DB 18,28,#08,0
-    DB 22,124,#01,0
-    DB 25,180,#20,0
-    DB 12,64,#04,0
-    DB 20,104,#80,0
-
     ; Mid layer: SCROLL_SPEED pixels every two frames.
     DB 6,73,#10,1
     DB 9,150,#01,1
@@ -2005,7 +2000,7 @@ STAR_POOL:
 ; -------------------------------------------------------------
 ; Input and HUD state.
 ; -------------------------------------------------------------
-SCROLL_SPEED:      DB 1        ; 1..4, multiplier for stars and asteroid speed
+SCROLL_SPEED:      DB 1        ; 1..3, multiplier for stars and asteroid speed
 SCORE:             DB 0        ; demo score 0..99
 HUD_DIRTY:         DB 1        ; dynamic numeric labels need redraw
 SPACE_HELD:        DB 0        ; key edge detection
