@@ -14,8 +14,8 @@ DRAW_SHIP:
 
 ERASE_SHIP:
     LD BC,(SHIP_CUR_POS)
-    CALL GET_SCREEN_ADDR
-    JP CLEAR_CELL_1_2
+    LD DE,#0201
+    JP STARFIELD_MARK_RECT
 
 ; Small explosion: 1x1 (8x8); large: 1x2 (16x8).
 ; Both use the original asteroid top-left Y with no offset.
@@ -37,11 +37,13 @@ DRAW_BLAST:
 
 ERASE_BLAST:
     LD BC,(BLAST_POS)
-    CALL GET_SCREEN_ADDR
+    LD DE,#0101
     LD A,(BLAST_TYPE)
     OR A
-    JP Z,CLEAR_CELL_1_1
-    JP CLEAR_CELL_1_2
+    JR Z,.MARK
+    LD D,2
+.MARK:
+    JP STARFIELD_MARK_RECT
 
 ; Clear screen only: all game objects are drawn by RENDER_FRAME.
 CLEAR_BITMAP:

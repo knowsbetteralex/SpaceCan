@@ -37,7 +37,7 @@ READ_SHIP_HORIZONTAL:
     LD (SHIP_DIRTY),A
     RET
 
-; Q/A change 1..4 for the HUD. Background movement comes later.
+; Q/A change speed 1..4 for the HUD, asteroids and starfield.
 READ_SPEED_KEYS:
     LD BC,#FBFE
     IN A,(C)
@@ -107,6 +107,7 @@ UPDATE_GAME:
     CALL UPDATE_ENEMIES
     CALL UPDATE_BULLETS
     CALL CHECK_SHIP_ENEMY_COLLISIONS
+    CALL STARFIELD_UPDATE
     RET
 
 ; Start an explosion at a destroyed asteroid (one effect slot).

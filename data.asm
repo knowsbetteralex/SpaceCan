@@ -250,9 +250,50 @@ BLAST_DIRTY:     DB 0
 SHIP_DIRTY:      DB 1
 
 ; -------------------------------------------------------------
-; Step 01: UI and input state.
+; Moving starfield: 24 points, three motion rates.
+; Each record: X cell, Y pixel (16..191), pixel bit, period mask.
 ; -------------------------------------------------------------
-SCROLL_SPEED:      DB 1        ; 1..4, background will use later
+STAR_CLOCK:    DB 0
+DIRTY_COUNT:   DB 0
+DIRTY_TAIL:    DW DIRTY_QUEUE
+DIRTY_MAP:     DS 768,0
+DIRTY_QUEUE:   DS 320,0          ; 160 unique character cells
+
+STAR_POOL:
+    ; Nearest: 2*SCROLL_SPEED pixels each frame.
+    DB 7,20,#10,0
+    DB 10,90,#02,0
+    DB 14,156,#40,0
+    DB 18,28,#08,0
+    DB 22,124,#01,0
+    DB 25,180,#20,0
+    DB 12,64,#04,0
+    DB 20,104,#80,0
+
+    ; Mid layer: SCROLL_SPEED pixels every two frames.
+    DB 6,73,#10,1
+    DB 9,150,#01,1
+    DB 13,43,#02,1
+    DB 16,170,#08,1
+    DB 19,84,#20,1
+    DB 23,37,#04,1
+    DB 8,114,#40,1
+    DB 24,141,#02,1
+
+    ; Far layer: SCROLL_SPEED pixels every four frames.
+    DB 7,178,#80,3
+    DB 11,22,#08,3
+    DB 15,128,#10,3
+    DB 17,66,#01,3
+    DB 21,152,#20,3
+    DB 25,98,#04,3
+    DB 10,52,#40,3
+    DB 19,186,#02,3
+
+; -------------------------------------------------------------
+; Input and HUD state.
+; -------------------------------------------------------------
+SCROLL_SPEED:      DB 1        ; 1..4, multiplier for stars and asteroid speed
 SCORE:             DB 0        ; demo score 0..99
 HUD_DIRTY:         DB 1        ; dynamic numeric labels need redraw
 SPACE_HELD:        DB 0        ; key edge detection

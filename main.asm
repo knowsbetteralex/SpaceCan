@@ -1,9 +1,9 @@
-; ZX Space Demo - Step 03: moving asteroids and hit points.
+; ZX Space Demo - Step 04: layered dirty-cell starfield.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Coordinates are in 8x8 character cells: X in low byte, Y in high byte.
 ; HUD: Y=0..1, corridor: X=6..25, Y=2..23.
-; Render immediately after HALT. Logic prepares the NEXT frame.
+; Render after HALT; update logic and moving stars for NEXT frame.
 
     ORG #9000
 
@@ -59,6 +59,7 @@ START:
     LDIR
 
     CALL INIT_ENEMIES
+    CALL STARFIELD_INIT
 
     XOR A
     LD (SHIP_DRAWN),A
@@ -73,7 +74,7 @@ START:
     LD (BLAST_DIRTY),A
 
     LD A,1
-    LD (SCROLL_SPEED),A         ; scroll starts at a later step
+    LD (SCROLL_SPEED),A         ; stars and asteroid speed
     LD (HUD_DIRTY),A
     LD (SHIP_DIRTY),A
 
@@ -104,6 +105,7 @@ MAIN_LOOP:
     INCLUDE "logic.asm"
     INCLUDE "bullets.asm"
     INCLUDE "enemies.asm"
+    INCLUDE "starfield.asm"
     INCLUDE "renderer.asm"
     INCLUDE "graphics.asm"
     INCLUDE "objects.asm"

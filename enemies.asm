@@ -366,19 +366,6 @@ DRAW_ENEMY_ROW:
     JP Z,DRAW_1_1
     JP DRAW_1_2
 
-; IN: A=0 top / 1 bottom, IX=enemy.
-; Clears last-drawn cell row, including attribute.
-ERASE_ENEMY_ROW:
-    LD B,(IX+E_DRAW_Y)
-    ADD A,B
-    LD B,A
-    LD C,(IX+E_DRAW_X)
-    CALL GET_SCREEN_ADDR
-    LD A,(IX+E_TYPE)
-    OR A
-    JP Z,CLEAR_CELL_1_1
-    JP CLEAR_CELL_1_2
-
 DRAW_ENEMY_SLOT:
     XOR A
     CALL DRAW_ENEMY_ROW
@@ -392,11 +379,17 @@ DRAW_ENEMY_SLOT:
     LD (IX+E_DRAWN),A
     RET
 
+; No writes to screen here: collect the old 1x2 / 2x2 rectangle.
 ERASE_ENEMY_SLOT:
-    XOR A
-    CALL ERASE_ENEMY_ROW
-    LD A,1
-    CALL ERASE_ENEMY_ROW
+    LD B,(IX+E_DRAW_Y)
+    LD C,(IX+E_DRAW_X)
+    LD DE,#0102                  ; D=width, E=height
+    LD A,(IX+E_TYPE)
+    OR A
+    JR Z,.MARK
+    LD D,2
+.MARK:
+    CALL STARFIELD_MARK_RECT
     XOR A
     LD (IX+E_DRAWN),A
     RET

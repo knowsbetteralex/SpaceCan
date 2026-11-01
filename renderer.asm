@@ -1,9 +1,9 @@
 ; -------------------------------------------------------------
-; Selective two-pass rendering, opaque object sprites.
+; Selective renderer for an opaque foreground over moving stars.
 ;
-; All changed objects are first erased to the corridor base
-; attributes/bitmap, then their new pictures are drawn.
-; No bitmap save/restore per object.
+; Old object footprints are queued as dirty character cells.
+; All queued cells are cleared and their star background reconstructed.
+; Changed objects are painted opaque over the reconstructed cells.
 ;
 ; DIRTY is set on movement, animation tick, damage, spawning or
 ; deactivation; it remains clear for an unchanged object.
@@ -13,6 +13,10 @@
 ; never punch through stationary opaque sprites.
 ; -------------------------------------------------------------
 RENDER_FRAME:
+    ; Star movement can invalidate otherwise stationary opaque objects.
+    CALL STARFIELD_INVALIDATE_FOREGROUND
+
+    ; Erase phase marks old footprints in the dirty-cell queue.
     CALL RENDER_ERASE_BULLETS
     CALL RENDER_ERASE_ENEMIES
 
@@ -34,8 +38,8 @@ RENDER_FRAME:
     XOR A
     LD (BLAST_DRAWN),A
 .BLAST_ERASE_DONE:
-    ; Future starfield update belongs here.
-    ; Background changes must mark overlapping objects DIRTY.
+    ; One clear per dirty cell, then plot current stars in those cells.
+    CALL STARFIELD_REFRESH_CELLS
 
     LD A,(BLAST_DIRTY)
     OR A
