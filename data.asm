@@ -33,7 +33,7 @@ SHIP_HP:
 ; Four fixed lanes; no two enemies intersect horizontally.
 ENEMY_START_TABLE:
     ; TYPE, X, Y, initial animation timer (1..4).
-    DB 0,8,2,1                  ; small, phase 1
+    DB 0,8,4,1                  ; small, phase 1
     DB 1,12,11,2                ; large, phase 2
     DB 0,19,5,3                 ; small, phase 3
     DB 1,23,16,4                ; large, phase 4
@@ -250,8 +250,8 @@ BLAST_DIRTY:     DB 0
 SHIP_DIRTY:      DB 1
 
 ; -------------------------------------------------------------
-; Moving starfield: 24 points, three motion rates.
-; Each record: X cell, Y pixel (16..191), pixel bit, period mask.
+; Moving starfield: 16 points, two slow motion rates.
+; Each record: X cell, Y pixel (32..191), pixel bit, period mask.
 ; -------------------------------------------------------------
 STAR_CLOCK:    DB 0
 DIRTY_COUNT:   DB 0
@@ -272,7 +272,7 @@ STAR_POOL:
 
     ; Far layer: SCROLL_SPEED pixels every four frames.
     DB 7,178,#80,3
-    DB 11,22,#08,3
+    DB 11,38,#08,3
     DB 15,128,#10,3
     DB 17,66,#01,3
     DB 21,152,#20,3
@@ -290,13 +290,8 @@ SPACE_HELD:        DB 0        ; key edge detection
 SPEED_UP_HELD:     DB 0
 SPEED_DOWN_HELD:   DB 0
 
-HUD_TEXT_0:    DB "SCORE 00    SPEED 1    HP 100",0
-HUD_TEXT_1:    DB "ZX SPACE DEMO     O/P Q/A SPACE",0
-LEFT_TEXT_0:  DB "SPEED",0
-LEFT_TEXT_1:  DB "0",0
-LEFT_TEXT_2:  DB "SHIP",0
-RIGHT_TEXT_0: DB "SECTOR",0
-RIGHT_TEXT_1: DB "01",0
-RIGHT_TEXT_2: DB "SHOTS",0
+HUD_LABEL_SPEED: DB "SPEED",0
+HUD_LABEL_SCORE: DB "SCORE",0
+HUD_LABEL_LIVES: DB "LIVES",0
 
 PROGRAM_END:

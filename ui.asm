@@ -1,71 +1,34 @@
 ; -------------------------------------------------------------
-; STATIC UI. Called once at START, outside the frame budget.
-; Paper colours distinguish HUD/panels from the black corridor.
-; Attributes: 32x24 starting at #5800; no attribute FLASH.
+; 4-row cockpit HUD and 20-row static side-hull tile pictures.
+; Dynamic values update only when HUD_DIRTY is set.
+; Existing SHIP_HP 100/75/50/25/0 -> 4/3/2/1/0 life tiles.
 ; -------------------------------------------------------------
 DRAW_STATIC_UI:
-    ; Two HUD rows: white ink on blue paper (BRIGHT).
-    LD HL,#5800
-    LD B,2
-.HUD_ROW:
-    LD C,32
-.HUD_CELL:
-    LD (HL),#4F
-    INC HL
-    DEC C
-    JR NZ,.HUD_CELL
-    DJNZ .HUD_ROW
-
-    ; Remaining 22 rows: left 6 + corridor 20 + right 6.
-    LD HL,#5840                  ; attributes at Y=2
-    LD B,22
-.SIDE_ROW:
-    LD C,6
-.LEFT_CELL:
-    LD (HL),#4F
-    INC HL
-    DEC C
-    JR NZ,.LEFT_CELL
-    LD DE,20
-    ADD HL,DE                   ; corridor remains black
-    LD C,6
-.RIGHT_CELL:
-    LD (HL),#4F
-    INC HL
-    DEC C
-    JR NZ,.RIGHT_CELL
-    DJNZ .SIDE_ROW
-
-    ; Text: X/Y in character cells. 48K ROM font at #3D00.
+    LD HL,HUD_TILE_MAP
     LD BC,#0000
-    LD DE,HUD_TEXT_0
-    CALL PRINT_TEXT
-    LD BC,#0100
-    LD DE,HUD_TEXT_1
-    CALL PRINT_TEXT
+    LD DE,#2004                 ; 32 x 4 HUD
+    CALL DRAW_TILE_MAP
 
-    LD BC,#0300
-    LD DE,LEFT_TEXT_0
-    CALL PRINT_TEXT
-    LD BC,#0600
-    LD DE,LEFT_TEXT_1
-    CALL PRINT_TEXT
-    LD BC,#1000
-    LD DE,LEFT_TEXT_2
-    CALL PRINT_TEXT
+    LD HL,SIDE_LEFT_TILE_MAP
+    LD BC,#0400                 ; left side: X=0, Y=4
+    LD DE,#0614                 ; 6 x 20
+    CALL DRAW_TILE_MAP
 
-    LD BC,#031A                  ; X=26, Y=3
-    LD DE,RIGHT_TEXT_0
-    CALL PRINT_TEXT
-    LD BC,#061A
-    LD DE,RIGHT_TEXT_1
-    CALL PRINT_TEXT
-    LD BC,#101A
-    LD DE,RIGHT_TEXT_2
-    CALL PRINT_TEXT
-    RET
+    LD HL,SIDE_RIGHT_TILE_MAP
+    LD BC,#041A                 ; right side: X=26, Y=4
+    LD DE,#0614
+    CALL DRAW_TILE_MAP
 
-; Draw only dynamic counters after HALT; no UI work when unchanged.
+    LD BC,#0102
+    LD DE,HUD_LABEL_SPEED
+    CALL PRINT_TEXT
+    LD BC,#010D
+    LD DE,HUD_LABEL_SCORE
+    CALL PRINT_TEXT
+    LD BC,#0118
+    LD DE,HUD_LABEL_LIVES
+    JP PRINT_TEXT
+
 RENDER_HUD:
     LD A,(HUD_DIRTY)
     OR A
@@ -73,50 +36,42 @@ RENDER_HUD:
     XOR A
     LD (HUD_DIRTY),A
 
-    LD A,(SCORE)                 ; 0..99, +10 for first target
-    LD BC,#0006                  ; SCORE 00: digits start X=6
+    LD A,(SCROLL_SPEED)
+    ADD A,'0'
+    LD BC,#0207                 ; speed (row 2, X=7)
+    CALL DRAW_CHAR_AT
+
+    LD A,(SCORE)
+    LD BC,#0210                 ; score (row 2, X=16-17)
     CALL PRINT_DEC2
 
-    LD A,(SCROLL_SPEED)
-    ADD A,48                     ; ASCII '0'
-    LD BC,#0012                  ; SPEED digit at X=18
-    CALL DRAW_CHAR_AT
-
-    LD A,(SCROLL_SPEED)
-    ADD A,48
-    LD BC,#0700                  ; left panel, below SPEED
-    CALL DRAW_CHAR_AT
-
-    ; Health at top-right: 100, 075, 050, 025, 000.
-    LD A,(SHIP_HP)
-    LD BC,#001A                  ; HP digits start at X=26
-    CP 100
-    JR NZ,.HP_BELOW_100
-    LD A,'1'
-    JR .HP_HUNDREDS
-.HP_BELOW_100:
-    LD A,'0'
-.HP_HUNDREDS:
+    ; Four shield tiles (X=25..28). Thresholds 25,50,75,100.
+    LD BC,#0219
+    LD D,25
+    LD E,4
+.LIVES:
     PUSH BC
-    CALL DRAW_CHAR_AT
+    PUSH DE
+    LD A,(SHIP_HP)
+    CP D
+    LD A,T_LIFE_OFF
+    JR C,.DRAW_LIFE
+    LD A,T_LIFE_ON
+.DRAW_LIFE:
+    CALL DRAW_TILE_ID
+    POP DE
     POP BC
     INC C
-    LD A,(SHIP_HP)
-    CP 100
-    JR NZ,.HP_LAST_TWO
-    XOR A
-.HP_LAST_TWO:
-    CALL PRINT_DEC2
-
-    ; Active bullets in flight: two digits below "SHOTS".
-    LD A,(BULLET_COUNT)
-    LD BC,#111C                  ; Y=17, X=28
-    CALL PRINT_DEC2
+    LD A,D
+    ADD A,25
+    LD D,A
+    DEC E
+    JR NZ,.LIVES
     RET
 
-; IN: A=0..99, BC=YX first digit; draw two decimal digits.
+; IN: A=0..99, BC=first digit coordinate (Y in B, X in C).
 PRINT_DEC2:
-    LD D,0                       ; tens
+    LD D,0
 .TENS:
     CP 10
     JR C,.WRITE
@@ -124,18 +79,18 @@ PRINT_DEC2:
     INC D
     JR .TENS
 .WRITE:
-    PUSH AF                      ; save units
+    PUSH AF
     LD A,D
-    ADD A,48
-    PUSH BC                      ; DRAW_CHAR_AT destroys B
+    ADD A,'0'
+    PUSH BC
     CALL DRAW_CHAR_AT
     POP BC
     INC C
     POP AF
-    ADD A,48
+    ADD A,'0'
     JP DRAW_CHAR_AT
 
-; IN: BC=YX, DE -> zero-terminated string (ASCII 32..127).
+; ROM font glyphs are also 8x8 bitmap tiles, starting at #3D00.
 PRINT_TEXT:
 .NEXT:
     LD A,(DE)
@@ -150,17 +105,16 @@ PRINT_TEXT:
     INC C
     JR .NEXT
 
-; IN: A=ASCII, BC=YX. Uses ZX Spectrum 48K ROM font.
-; OUT: character rendered. DESTROYS: AF, B, DE, HL.
+; IN: A=ASCII 32..127, BC=screen YX.
 DRAW_CHAR_AT:
     SUB 32
     LD L,A
     LD H,0
     ADD HL,HL
     ADD HL,HL
-    ADD HL,HL                  ; font offset = (ASCII-32)*8
-    LD DE,#3D00                 ; ROM charset, character 32
+    ADD HL,HL
+    LD DE,#3D00
     ADD HL,DE
-    EX DE,HL                   ; DE = eight bitmap bytes
+    EX DE,HL
     CALL GET_SCREEN_ADDR
     JP DRAW_1_1

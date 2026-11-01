@@ -45,7 +45,7 @@ STARFIELD_INIT:
     DJNZ .INIT_STARS
     RET
 
-; Input BC: B = character Y (2..23), C = character X (6..25).
+; Input BC: B = character Y (4..23), C = character X (6..25).
 ; Output HL: byte in DIRTY_MAP at offset Y*32 + X.
 ; Destroys DE, HL. Preserves BC.
 STARFIELD_MAP_ADDRESS:
@@ -191,7 +191,7 @@ STARFIELD_UPDATE:
     ADD A,C
     CP 192
     JR C,.SAVE_Y
-    SUB 176                  ; wrap into Y=16..191, preserve excess
+    SUB 160                  ; wrap into Y=32..191, preserve excess
     LD (IX+S_Y),A
     LD A,(IX+S_X)
     INC A

@@ -1,15 +1,15 @@
-; ZX Space Demo - Step 04: layered dirty-cell starfield.
+; ZX Space Demo - Step 05: four-row tiled cockpit and side hull.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Coordinates are in 8x8 character cells: X in low byte, Y in high byte.
-; HUD: Y=0..1, corridor: X=6..25, Y=2..23.
+; Cockpit HUD: Y=0..3; playfield: X=6..25, Y=4..23.
 ; Render after HALT; update logic and moving stars for NEXT frame.
 
     ORG #9000
 
 BLAST_FRAME_DURATION EQU 4
 BLAST_FRAME_COUNT    EQU 4
-PLAYFIELD_TOP        EQU 2
+PLAYFIELD_TOP        EQU 4
 MAX_BULLETS          EQU 6
 BULLET_SLOT_SIZE     EQU 8
 MAX_ENEMIES          EQU 4
@@ -109,5 +109,6 @@ MAIN_LOOP:
     INCLUDE "renderer.asm"
     INCLUDE "graphics.asm"
     INCLUDE "objects.asm"
+    INCLUDE "tiles.asm"
     INCLUDE "ui.asm"
     INCLUDE "data.asm"

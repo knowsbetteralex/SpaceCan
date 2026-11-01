@@ -38,7 +38,6 @@ FIRE_BULLET:
     LD (IX+B_DIRTY),A
     LD HL,BULLET_COUNT
     INC (HL)
-    LD (HUD_DIRTY),A
     RET
 .NEXT_SLOT:
     LD DE,BULLET_SLOT_SIZE
@@ -131,7 +130,6 @@ DEACTIVATE_BULLET:
     LD (IX+B_DIRTY),A
     LD HL,BULLET_COUNT
     DEC (HL)
-    LD (HUD_DIRTY),A
     RET
 
 ; -------------------------------------------------------------
