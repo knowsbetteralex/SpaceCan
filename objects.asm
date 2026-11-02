@@ -5,8 +5,8 @@
 ; -------------------------------------------------------------
 
 DRAW_SHIP:
-    ; Select one of five 16x8 pictures without changing its X/Y.
-    ; Bank is a visual effect only: logical collision box is 2x1.
+    ; Select one of five 8x8 pictures without changing its X/Y.
+    ; Visual bank is independent of position; hitbox = one cell.
     LD A,(SHIP_BANK)             ; 0..4
     ADD A,A                      ; 2-byte DW address table
     LD E,A
@@ -15,19 +15,19 @@ DRAW_SHIP:
     ADD HL,DE
     LD E,(HL)
     INC HL
-    LD D,(HL)                    ; DE -> 16-byte sprite
+    LD D,(HL)                    ; DE -> 8-byte sprite
     PUSH DE
 
     LD BC,(SHIP_NEW_POS)
     CALL GET_SCREEN_ADDR
     LD DE,SHIP_ATTR
-    CALL RESTORE_ATTR_1_2
+    CALL RESTORE_ATTR_1_1
     POP DE
-    JP DRAW_1_2
+    JP DRAW_1_1
 
 ERASE_SHIP:
     LD BC,(SHIP_CUR_POS)
-    LD DE,#0201
+    LD DE,#0101
     JP STARFIELD_MARK_RECT
 
 ; Small explosion: 1x1 (8x8); large: 1x2 (16x8).

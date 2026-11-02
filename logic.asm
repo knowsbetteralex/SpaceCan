@@ -8,54 +8,87 @@ READ_INPUT:
     CALL READ_FIRE_KEY
     RET
 
-; Ship is 16 pixels wide, left X=6..24, fixed Y=22.
-; Five banking poses: 0=hard left, 1=soft left, 2=level,
-; 3=soft right, 4=hard right. Each frame moves one pose toward
-; the desired direction, including a gradual return to level.
+; The ship is now 8x8: one screen cell (X=6..25, Y=22).
+; Movement is still one cell per input tick; banking is independent:
+; one pose every SHIP_BANK_DELAY frames, then a short hold after
+; release to make brief turns visible.
 READ_SHIP_HORIZONTAL:
     LD A,(SHIP_NEW_POS)
     LD E,A
     LD BC,#DFFE
     IN A,(C)
-    BIT 0,A                       ; P moves right
+    BIT 0,A                    ; P: move right
     JR NZ,.CHECK_LEFT
     LD A,E
-    CP 24
-    JR Z,.STOP
+    CP 25
+    JR Z,.BANK_RIGHT
     INC E
-    LD B,4                         ; target right bank
-    JR .APPLY
+.BANK_RIGHT:
+    LD D,4                     ; lean right
+    JR .MOVE
+
 .CHECK_LEFT:
-    BIT 1,A                       ; O moves left
-    JR NZ,.STOP
+    BIT 1,A                    ; O: move left
+    JR NZ,.NO_KEY
     LD A,E
     CP 6
-    JR Z,.STOP
+    JR Z,.BANK_LEFT
     DEC E
-    LD B,0                         ; target left bank
-    JR .APPLY
-.STOP:
-    LD B,2                         ; level when motion stops
-
-.APPLY:
+.BANK_LEFT:
+    LD D,0                     ; lean left
+.MOVE:
     LD A,(SHIP_NEW_POS)
     CP E
-    JR Z,.UPDATE_BANK
+    JR Z,.SET_BANK
     LD A,E
     LD (SHIP_NEW_POS),A
     LD A,1
     LD (SHIP_DIRTY),A
+.SET_BANK:
+    LD A,D
+    LD (SHIP_BANK_TARGET),A
+    LD A,SHIP_BANK_HOLD
+    LD (SHIP_BANK_HOLD_TIMER),A
 
-.UPDATE_BANK:
-    LD A,(SHIP_BANK)
-    CP B
-    RET Z
-    JR C,.BANK_RIGHT
+.NO_KEY:
+    JP UPDATE_SHIP_BANK
+
+; Smooth pose selection; no graphics are drawn here.
+; BANK = 0,1,2,3,4. Starts with an immediate first tilt,
+; then advances one more pose every 5 game frames (0.1s).
+; After movement ends, the last pose remains for ~0.28s,
+; then steps back toward the neutral pose (2).
+UPDATE_SHIP_BANK:
+    LD A,(SHIP_BANK_HOLD_TIMER)
+    OR A
+    JR Z,.LEVEL
     DEC A
-    JR .SAVE_BANK
-.BANK_RIGHT:
+    LD (SHIP_BANK_HOLD_TIMER),A
+    JR NZ,.TIMER
+.LEVEL:
+    LD A,2
+    LD (SHIP_BANK_TARGET),A
+
+.TIMER:
+    LD A,(SHIP_BANK_TIMER)
+    OR A
+    JR Z,.STEP
+    DEC A
+    LD (SHIP_BANK_TIMER),A
+    RET
+.STEP:
+    LD A,SHIP_BANK_DELAY-1
+    LD (SHIP_BANK_TIMER),A
+    LD A,(SHIP_BANK)
+    LD HL,SHIP_BANK_TARGET
+    CP (HL)
+    RET Z
+    JR C,.UP
+    DEC A
+    JR .STORE
+.UP:
     INC A
-.SAVE_BANK:
+.STORE:
     LD (SHIP_BANK),A
     LD A,1
     LD (SHIP_DIRTY),A

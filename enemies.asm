@@ -359,38 +359,35 @@ CHECK_SHIP_ENEMY_COLLISIONS:
     DJNZ .NEXT
     RET
 
+; Ship occupies one X column and one row.
+; Small asteroid: 1x1; large: 2x2.
 CHECK_SHIP_ENEMY_SLOT:
     LD A,(IX+E_ACTIVE)
     OR A
     RET Z
-    ; Small asteroid occupies only Y; large occupies Y and Y+1.
+
     LD A,(SHIP_NEW_POS+1)
     SUB (IX+E_Y)
-    JR C,.NO_HIT
+    RET C
     OR A
     JR Z,.CHECK_X
     CP 1
-    JR NZ,.NO_HIT
-    LD A,(IX+E_TYPE)
-    OR A
-    JR Z,.NO_HIT
-.CHECK_X:
-    LD A,(SHIP_NEW_POS)
-    LD C,A                       ; ship left column
-    LD A,(IX+E_X)
-    CP C
-    JR Z,.HIT
-    LD A,C
-    INC A
-    CP (IX+E_X)                ; enemy starts at ship right
-    JR Z,.HIT
+    RET NZ
     LD A,(IX+E_TYPE)
     OR A
     RET Z
-    LD A,(IX+E_X)
-    INC A
-    CP C                       ; large enemy ends at ship left
-    RET NZ
+
+.CHECK_X:
+    LD A,(SHIP_NEW_POS)
+    SUB (IX+E_X)
+    RET C                       ; ship is left of the asteroid
+    OR A
+    JR Z,.HIT
+    CP 1
+    RET NZ                      ; ship too far to the right
+    LD A,(IX+E_TYPE)
+    OR A
+    RET Z                       ; small asteroid is only 1 cell wide
 .HIT:
     CALL DEACTIVATE_ENEMY
     LD A,(SHIP_HP)
@@ -400,8 +397,6 @@ CHECK_SHIP_ENEMY_SLOT:
     LD (SHIP_HP),A
     LD A,1
     LD (HUD_DIRTY),A
-    RET
-.NO_HIT:
     RET
 
 ; IN: IX=bullet; OUT: carry set iff bullet consumed.

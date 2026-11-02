@@ -10,68 +10,74 @@ SHIP_START_POS:
     DB 15,22
 
 SHIP_FRAMES:
-    ; Bank poses 0..4: hard-left, left, level, right, hard-right.
+    ; Five 8x8 poses, from hard left (0) to hard right (4).
     DW SHIP_BANK_LEFT_HARD,SHIP_BANK_LEFT_SOFT,SHIP_SPRITE
     DW SHIP_BANK_RIGHT_SOFT,SHIP_BANK_RIGHT_HARD
 
 SHIP_BANK_LEFT_HARD:
-    DB #06,#00
-    DB #0F,#00
-    DB #3F,#C0
-    DB #7F,#F8
-    DB #FF,#FC
-    DB #7F,#78
-    DB #39,#C0
-    DB #11,#00
+    DB %00110000
+    DB %01111000
+    DB %11111100
+    DB %11111110
+    DB %01111100
+    DB %00110100
+    DB %00011000
+    DB %00010000
 
 SHIP_BANK_LEFT_SOFT:
-    DB #03,#00
-    DB #07,#80
-    DB #1F,#E0
-    DB #3F,#FC
-    DB #7F,#FE
-    DB #3E,#FC
-    DB #19,#98
-    DB #08,#10
+    DB %00011000
+    DB %00111100
+    DB %01111110
+    DB %11111110
+    DB %01111110
+    DB %00101100
+    DB %00011000
+    DB %00010000
 
 SHIP_SPRITE:
-    DB #01,#80
-    DB #03,#C0
-    DB #1F,#F8
-    DB #7F,#FE
-    DB #FF,#FF
-    DB #EF,#6F
-    DB #44,#22
-    DB #04,#08
+    DB %00011000
+    DB %00111100
+    DB %00111100
+    DB %01111110
+    DB %11111111
+    DB %11011011
+    DB %00011000
+    DB %00011000
 
 SHIP_BANK_RIGHT_SOFT:
-    DB #00,#C0
-    DB #01,#E0
-    DB #07,#F8
-    DB #3F,#FC
-    DB #7F,#FE
-    DB #3F,#7C
-    DB #19,#98
-    DB #08,#10
+    DB %00011000
+    DB %00111100
+    DB %01111110
+    DB %01111111
+    DB %01111110
+    DB %00110100
+    DB %00011000
+    DB %00001000
 
 SHIP_BANK_RIGHT_HARD:
-    DB #00,#60
-    DB #00,#F0
-    DB #03,#FC
-    DB #1F,#FE
-    DB #3F,#FF
-    DB #1E,#FE
-    DB #03,#9C
-    DB #00,#88
+    DB %00001100
+    DB %00011110
+    DB %00111111
+    DB %01111111
+    DB %00111110
+    DB %00101100
+    DB %00011000
+    DB %00001000
 
 SHIP_ATTR:
-    DB #46,#46                 ; bright yellow on black
+    DB #46                      ; bright yellow on black
 SHIP_CUR_POS:
     DB 15,22                   ; last painted position
 SHIP_NEW_POS:
     DB 15,22                   ; logical target
 SHIP_BANK:
     DB 2                         ; 0..4, neutral = 2
+SHIP_BANK_TARGET:
+    DB 2                         ; desired pose from O/P
+SHIP_BANK_TIMER:
+    DB 0                         ; frames until next pose update
+SHIP_BANK_HOLD_TIMER:
+    DB 0                         ; pause before leveling after key release
 SHIP_DRAWN:
     DB 0
 
@@ -343,7 +349,7 @@ BLAST_FRAME_3:
     DB $20,$01
     DB $00,$00
 
-; Individual dirty flags for static target, blast, and player.
+; Dirty flags for explosion and player.
 ; Bullet dirty state is inside each bullet slot.
 BLAST_DIRTY:     DB 0
 SHIP_DIRTY:      DB 1

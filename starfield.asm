@@ -219,7 +219,7 @@ STARFIELD_INVALIDATE_FOREGROUND:
     OR A
     JR Z,.BLAST
     LD BC,(SHIP_CUR_POS)
-    LD DE,#0201              ; width=2, height=1
+    LD DE,#0101              ; ship is now 1x1
     CALL STARFIELD_TEST_RECT
     OR A
     JR Z,.BLAST

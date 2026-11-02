@@ -1,5 +1,5 @@
 ; ===== main.asm =====
-; ZX Space Demo - Step 05.2: straight-falling random-X asteroids, ship banking.
+; ZX Space Demo - Step 05.3: compact 8x8 ship, slower banking.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Coordinates are in 8x8 character cells: X in low byte, Y in high byte.
@@ -11,6 +11,8 @@
 BLAST_FRAME_DURATION EQU 4
 BLAST_FRAME_COUNT    EQU 4
 PLAYFIELD_TOP        EQU 4
+SHIP_BANK_DELAY      EQU 5    ; ticks between 8x8 banking poses
+SHIP_BANK_HOLD       EQU 14   ; keep tilt after releasing O/P
 MAX_BULLETS          EQU 6
 BULLET_SLOT_SIZE     EQU 8
 MAX_ENEMIES          EQU 4
@@ -106,7 +108,10 @@ START:
     LD (SHIP_NEW_POS),HL
     LD A,2
     LD (SHIP_BANK),A
+    LD (SHIP_BANK_TARGET),A
     XOR A
+    LD (SHIP_BANK_TIMER),A
+    LD (SHIP_BANK_HOLD_TIMER),A
     LD (BLAST_TYPE),A
     LD HL,BLAST_FRAME_0
     LD (BLAST_FRAME_PTR),HL
@@ -138,54 +143,87 @@ READ_INPUT:
     CALL READ_FIRE_KEY
     RET
 
-; Ship is 16 pixels wide, left X=6..24, fixed Y=22.
-; Five banking poses: 0=hard left, 1=soft left, 2=level,
-; 3=soft right, 4=hard right. Each frame moves one pose toward
-; the desired direction, including a gradual return to level.
+; The ship is now 8x8: one screen cell (X=6..25, Y=22).
+; Movement is still one cell per input tick; banking is independent:
+; one pose every SHIP_BANK_DELAY frames, then a short hold after
+; release to make brief turns visible.
 READ_SHIP_HORIZONTAL:
     LD A,(SHIP_NEW_POS)
     LD E,A
     LD BC,#DFFE
     IN A,(C)
-    BIT 0,A                       ; P moves right
+    BIT 0,A                    ; P: move right
     JR NZ,.CHECK_LEFT
     LD A,E
-    CP 24
-    JR Z,.STOP
+    CP 25
+    JR Z,.BANK_RIGHT
     INC E
-    LD B,4                         ; target right bank
-    JR .APPLY
+.BANK_RIGHT:
+    LD D,4                     ; lean right
+    JR .MOVE
+
 .CHECK_LEFT:
-    BIT 1,A                       ; O moves left
-    JR NZ,.STOP
+    BIT 1,A                    ; O: move left
+    JR NZ,.NO_KEY
     LD A,E
     CP 6
-    JR Z,.STOP
+    JR Z,.BANK_LEFT
     DEC E
-    LD B,0                         ; target left bank
-    JR .APPLY
-.STOP:
-    LD B,2                         ; level when motion stops
-
-.APPLY:
+.BANK_LEFT:
+    LD D,0                     ; lean left
+.MOVE:
     LD A,(SHIP_NEW_POS)
     CP E
-    JR Z,.UPDATE_BANK
+    JR Z,.SET_BANK
     LD A,E
     LD (SHIP_NEW_POS),A
     LD A,1
     LD (SHIP_DIRTY),A
+.SET_BANK:
+    LD A,D
+    LD (SHIP_BANK_TARGET),A
+    LD A,SHIP_BANK_HOLD
+    LD (SHIP_BANK_HOLD_TIMER),A
 
-.UPDATE_BANK:
-    LD A,(SHIP_BANK)
-    CP B
-    RET Z
-    JR C,.BANK_RIGHT
+.NO_KEY:
+    JP UPDATE_SHIP_BANK
+
+; Smooth pose selection; no graphics are drawn here.
+; BANK = 0,1,2,3,4. Starts with an immediate first tilt,
+; then advances one more pose every 5 game frames (0.1s).
+; After movement ends, the last pose remains for ~0.28s,
+; then steps back toward the neutral pose (2).
+UPDATE_SHIP_BANK:
+    LD A,(SHIP_BANK_HOLD_TIMER)
+    OR A
+    JR Z,.LEVEL
     DEC A
-    JR .SAVE_BANK
-.BANK_RIGHT:
+    LD (SHIP_BANK_HOLD_TIMER),A
+    JR NZ,.TIMER
+.LEVEL:
+    LD A,2
+    LD (SHIP_BANK_TARGET),A
+
+.TIMER:
+    LD A,(SHIP_BANK_TIMER)
+    OR A
+    JR Z,.STEP
+    DEC A
+    LD (SHIP_BANK_TIMER),A
+    RET
+.STEP:
+    LD A,SHIP_BANK_DELAY-1
+    LD (SHIP_BANK_TIMER),A
+    LD A,(SHIP_BANK)
+    LD HL,SHIP_BANK_TARGET
+    CP (HL)
+    RET Z
+    JR C,.UP
+    DEC A
+    JR .STORE
+.UP:
     INC A
-.SAVE_BANK:
+.STORE:
     LD (SHIP_BANK),A
     LD A,1
     LD (SHIP_DIRTY),A
@@ -354,7 +392,7 @@ SELECT_BLAST_FRAME:
 ; -------------------------------------------------------------
 
 ; Find a free slot and spawn a bullet directly above the ship.
-; Spawned bullet stays at Y=ship-1 for its first visible frame.
+; Spawn bullet at ship X and row Y-1, aligned with the 8x8 nose.
 ; DESTROYS AF, BC, DE, HL, IX.
 FIRE_BULLET:
     LD A,(BULLET_COUNT)
@@ -371,8 +409,8 @@ FIRE_BULLET:
     JR NZ,.NEXT_SLOT
 
     LD HL,(SHIP_NEW_POS)
-    INC L                        ; centre (right cell of ship)
-    DEC H                        ; one row above the ship
+    ; Same character X as the 8x8 ship: bullet is aligned with nose.
+    DEC H                        ; launch one row above the ship
     LD (IX+B_X),L
     LD (IX+B_Y),H
     LD A,1
@@ -905,38 +943,35 @@ CHECK_SHIP_ENEMY_COLLISIONS:
     DJNZ .NEXT
     RET
 
+; Ship occupies one X column and one row.
+; Small asteroid: 1x1; large: 2x2.
 CHECK_SHIP_ENEMY_SLOT:
     LD A,(IX+E_ACTIVE)
     OR A
     RET Z
-    ; Small asteroid occupies only Y; large occupies Y and Y+1.
+
     LD A,(SHIP_NEW_POS+1)
     SUB (IX+E_Y)
-    JR C,.NO_HIT
+    RET C
     OR A
     JR Z,.CHECK_X
     CP 1
-    JR NZ,.NO_HIT
-    LD A,(IX+E_TYPE)
-    OR A
-    JR Z,.NO_HIT
-.CHECK_X:
-    LD A,(SHIP_NEW_POS)
-    LD C,A                       ; ship left column
-    LD A,(IX+E_X)
-    CP C
-    JR Z,.HIT
-    LD A,C
-    INC A
-    CP (IX+E_X)                ; enemy starts at ship right
-    JR Z,.HIT
+    RET NZ
     LD A,(IX+E_TYPE)
     OR A
     RET Z
-    LD A,(IX+E_X)
-    INC A
-    CP C                       ; large enemy ends at ship left
-    RET NZ
+
+.CHECK_X:
+    LD A,(SHIP_NEW_POS)
+    SUB (IX+E_X)
+    RET C                       ; ship is left of the asteroid
+    OR A
+    JR Z,.HIT
+    CP 1
+    RET NZ                      ; ship too far to the right
+    LD A,(IX+E_TYPE)
+    OR A
+    RET Z                       ; small asteroid is only 1 cell wide
 .HIT:
     CALL DEACTIVATE_ENEMY
     LD A,(SHIP_HP)
@@ -946,8 +981,6 @@ CHECK_SHIP_ENEMY_SLOT:
     LD (SHIP_HP),A
     LD A,1
     LD (HUD_DIRTY),A
-    RET
-.NO_HIT:
     RET
 
 ; IN: IX=bullet; OUT: carry set iff bullet consumed.
@@ -1363,7 +1396,7 @@ STARFIELD_INVALIDATE_FOREGROUND:
     OR A
     JR Z,.BLAST
     LD BC,(SHIP_CUR_POS)
-    LD DE,#0201              ; width=2, height=1
+    LD DE,#0101              ; ship is now 1x1
     CALL STARFIELD_TEST_RECT
     OR A
     JR Z,.BLAST
@@ -1716,8 +1749,8 @@ CLEAR_CELL_1_2:
 ; -------------------------------------------------------------
 
 DRAW_SHIP:
-    ; Select one of five 16x8 pictures without changing its X/Y.
-    ; Bank is a visual effect only: logical collision box is 2x1.
+    ; Select one of five 8x8 pictures without changing its X/Y.
+    ; Visual bank is independent of position; hitbox = one cell.
     LD A,(SHIP_BANK)             ; 0..4
     ADD A,A                      ; 2-byte DW address table
     LD E,A
@@ -1726,19 +1759,19 @@ DRAW_SHIP:
     ADD HL,DE
     LD E,(HL)
     INC HL
-    LD D,(HL)                    ; DE -> 16-byte sprite
+    LD D,(HL)                    ; DE -> 8-byte sprite
     PUSH DE
 
     LD BC,(SHIP_NEW_POS)
     CALL GET_SCREEN_ADDR
     LD DE,SHIP_ATTR
-    CALL RESTORE_ATTR_1_2
+    CALL RESTORE_ATTR_1_1
     POP DE
-    JP DRAW_1_2
+    JP DRAW_1_1
 
 ERASE_SHIP:
     LD BC,(SHIP_CUR_POS)
-    LD DE,#0201
+    LD DE,#0101
     JP STARFIELD_MARK_RECT
 
 ; Small explosion: 1x1 (8x8); large: 1x2 (16x8).
@@ -2137,68 +2170,74 @@ SHIP_START_POS:
     DB 15,22
 
 SHIP_FRAMES:
-    ; Bank poses 0..4: hard-left, left, level, right, hard-right.
+    ; Five 8x8 poses, from hard left (0) to hard right (4).
     DW SHIP_BANK_LEFT_HARD,SHIP_BANK_LEFT_SOFT,SHIP_SPRITE
     DW SHIP_BANK_RIGHT_SOFT,SHIP_BANK_RIGHT_HARD
 
 SHIP_BANK_LEFT_HARD:
-    DB #06,#00
-    DB #0F,#00
-    DB #3F,#C0
-    DB #7F,#F8
-    DB #FF,#FC
-    DB #7F,#78
-    DB #39,#C0
-    DB #11,#00
+    DB %00110000
+    DB %01111000
+    DB %11111100
+    DB %11111110
+    DB %01111100
+    DB %00110100
+    DB %00011000
+    DB %00010000
 
 SHIP_BANK_LEFT_SOFT:
-    DB #03,#00
-    DB #07,#80
-    DB #1F,#E0
-    DB #3F,#FC
-    DB #7F,#FE
-    DB #3E,#FC
-    DB #19,#98
-    DB #08,#10
+    DB %00011000
+    DB %00111100
+    DB %01111110
+    DB %11111110
+    DB %01111110
+    DB %00101100
+    DB %00011000
+    DB %00010000
 
 SHIP_SPRITE:
-    DB #01,#80
-    DB #03,#C0
-    DB #1F,#F8
-    DB #7F,#FE
-    DB #FF,#FF
-    DB #EF,#6F
-    DB #44,#22
-    DB #04,#08
+    DB %00011000
+    DB %00111100
+    DB %00111100
+    DB %01111110
+    DB %11111111
+    DB %11011011
+    DB %00011000
+    DB %00011000
 
 SHIP_BANK_RIGHT_SOFT:
-    DB #00,#C0
-    DB #01,#E0
-    DB #07,#F8
-    DB #3F,#FC
-    DB #7F,#FE
-    DB #3F,#7C
-    DB #19,#98
-    DB #08,#10
+    DB %00011000
+    DB %00111100
+    DB %01111110
+    DB %01111111
+    DB %01111110
+    DB %00110100
+    DB %00011000
+    DB %00001000
 
 SHIP_BANK_RIGHT_HARD:
-    DB #00,#60
-    DB #00,#F0
-    DB #03,#FC
-    DB #1F,#FE
-    DB #3F,#FF
-    DB #1E,#FE
-    DB #03,#9C
-    DB #00,#88
+    DB %00001100
+    DB %00011110
+    DB %00111111
+    DB %01111111
+    DB %00111110
+    DB %00101100
+    DB %00011000
+    DB %00001000
 
 SHIP_ATTR:
-    DB #46,#46                 ; bright yellow on black
+    DB #46                      ; bright yellow on black
 SHIP_CUR_POS:
     DB 15,22                   ; last painted position
 SHIP_NEW_POS:
     DB 15,22                   ; logical target
 SHIP_BANK:
     DB 2                         ; 0..4, neutral = 2
+SHIP_BANK_TARGET:
+    DB 2                         ; desired pose from O/P
+SHIP_BANK_TIMER:
+    DB 0                         ; frames until next pose update
+SHIP_BANK_HOLD_TIMER:
+    DB 0                         ; pause before leveling after key release
 SHIP_DRAWN:
     DB 0
 
@@ -2470,7 +2509,7 @@ BLAST_FRAME_3:
     DB $20,$01
     DB $00,$00
 
-; Individual dirty flags for static target, blast, and player.
+; Dirty flags for explosion and player.
 ; Bullet dirty state is inside each bullet slot.
 BLAST_DIRTY:     DB 0
 SHIP_DIRTY:      DB 1

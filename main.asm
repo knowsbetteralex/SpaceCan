@@ -1,4 +1,4 @@
-; ZX Space Demo - Step 05.2: straight-falling random-X asteroids, ship banking.
+; ZX Space Demo - Step 05.3: compact 8x8 ship, slower banking.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Coordinates are in 8x8 character cells: X in low byte, Y in high byte.
@@ -10,6 +10,8 @@
 BLAST_FRAME_DURATION EQU 4
 BLAST_FRAME_COUNT    EQU 4
 PLAYFIELD_TOP        EQU 4
+SHIP_BANK_DELAY      EQU 5    ; ticks between 8x8 banking poses
+SHIP_BANK_HOLD       EQU 14   ; keep tilt after releasing O/P
 MAX_BULLETS          EQU 6
 BULLET_SLOT_SIZE     EQU 8
 MAX_ENEMIES          EQU 4
@@ -83,7 +85,10 @@ START:
     LD (SHIP_NEW_POS),HL
     LD A,2
     LD (SHIP_BANK),A
+    LD (SHIP_BANK_TARGET),A
     XOR A
+    LD (SHIP_BANK_TIMER),A
+    LD (SHIP_BANK_HOLD_TIMER),A
     LD (BLAST_TYPE),A
     LD HL,BLAST_FRAME_0
     LD (BLAST_FRAME_PTR),HL
