@@ -1,8 +1,8 @@
-; SpaceCan Step 06: narrow can corridor, auto progression and tile artwork.
+; SpaceCan Step 07: native ZX bitmap artwork + game overlay.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Coordinates are in 8x8 character cells: X in low byte, Y in high byte.
-; Cockpit HUD: Y=0..3; playfield: X=6..25, Y=4..23.
+; Cockpit HUD: Y=0..3; playfield: X=8..23, Y=4..23.
 ; Render after HALT; update logic and moving stars for NEXT frame.
 
     ORG #9000
@@ -56,8 +56,7 @@ B_RESERVED  EQU 7       ; padding; no saved background
 
 START:
     DI
-    CALL CLEAR_BITMAP
-    CALL DRAW_STATIC_UI
+    CALL DRAW_STATIC_UI          ; decompress can/bar screen then labels
     LD A,1
     OUT (#FE),A                  ; blue border
 
@@ -127,6 +126,6 @@ MAIN_LOOP:
     INCLUDE "renderer.asm"
     INCLUDE "graphics.asm"
     INCLUDE "objects.asm"
-    INCLUDE "tiles.asm"
     INCLUDE "ui.asm"
     INCLUDE "data.asm"
+    INCLUDE "artwork.asm"

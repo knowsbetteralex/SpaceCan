@@ -1,49 +1,56 @@
 ; -------------------------------------------------------------
-; SpaceCan Step 06: "Space Soda 0.33 L" static can/wall/bar mural.
-; Top 4 rows: HUD (32x4). Sides: wall + can, 8x20 each.
-; Only digital SPEED / SCORE / LIVES change at runtime.
+; SpaceCan Step 07: static native ZX can-and-bar background.
+; Artwork is unpacked once; only numbers are changed at runtime.
 ; -------------------------------------------------------------
 DRAW_STATIC_UI:
-    LD HL,HUD_TILE_MAP
-    LD BC,#0000
-    LD DE,#2004                  ; 32x4
-    CALL DRAW_TILE_MAP
+    ; Draw the complete ZX screen, including a pure-black 16x20
+    ; gameplay corridor. No images are ever copied during gameplay.
+    CALL LOAD_SPACE_CAN_SCREEN
 
-    LD HL,CAN_LEFT_TILE_MAP
-    LD BC,#0400                  ; Y=4, X=0
-    LD DE,#0814                  ; 8x20
-    CALL DRAW_TILE_MAP
-
-    LD HL,CAN_RIGHT_TILE_MAP
-    LD BC,#0418                  ; Y=4, X=24
-    LD DE,#0814                  ; 8x20
-    CALL DRAW_TILE_MAP
-
-    ; ROM font characters are also 8x8 tiles.
-    LD BC,#000B                  ; top chrome rail
+    ; Static ROM characters are painted ON TOP of blank HUD cells.
+    ; They are not baked in the .SCR so their 8x8 pixels are crisp.
+    LD BC,#0005                  ; title at Y=0, X=5
     LD DE,HUD_LABEL_TITLE
     CALL PRINT_TEXT
-
-    LD BC,#0102
+    LD BC,#0201                  ; SPEED
     LD DE,HUD_LABEL_SPEED
     CALL PRINT_TEXT
-    LD BC,#010C
+    LD BC,#020B                  ; SCORE
     LD DE,HUD_LABEL_SCORE
     CALL PRINT_TEXT
-    LD BC,#0119
+    LD BC,#0217                  ; LIVES
     LD DE,HUD_LABEL_LIVES
-    CALL PRINT_TEXT
-
-    ; Label fragments on either side of the black playfield.
-    LD BC,#0904                  ; left can X=4..6
-    LD DE,CAN_LABEL_LEFT
-    CALL PRINT_TEXT
-    LD BC,#0919                  ; right can X=25..27
-    LD DE,CAN_LABEL_RIGHT
-    CALL PRINT_TEXT
-    LD BC,#0619                  ; 0.33 as a small can mark
-    LD DE,CAN_LABEL_VOLUME
     JP PRINT_TEXT
+
+; Decode RLE background directly into ZX bitmap and attributes.
+; 00,count,value => repeat byte count times; nonzero => literal byte.
+; IN: none. OUT: #4000..#5AFF = exactly 6912 screen bytes.
+; DESTROYS: AF, BC, DE, HL. Caller has disabled interrupts.
+LOAD_SPACE_CAN_SCREEN:
+    LD HL,SPACE_CAN_SCREEN_RLE
+    LD DE,#4000
+.NEXT:
+    LD A,(HL)
+    INC HL
+    OR A
+    JR Z,.RUN_HEADER
+    LD (DE),A
+    INC DE
+    JR .CHECK_END
+.RUN_HEADER:
+    LD B,(HL)                    ; run length always 1..255
+    INC HL
+    LD A,(HL)                    ; repeated byte
+    INC HL
+.REPEAT:
+    LD (DE),A
+    INC DE
+    DJNZ .REPEAT
+.CHECK_END:
+    LD A,D
+    CP #5B                       ; DE reached #5B00, end of attributes
+    JR NZ,.NEXT
+    RET
 
 ; Draw no more than 7 characters when a reading changes.
 RENDER_HUD:
@@ -55,16 +62,16 @@ RENDER_HUD:
 
     LD A,(SCROLL_SPEED)
     ADD A,'0'
-    LD BC,#0205                  ; SPEED
+    LD BC,#0207                  ; SPEED number
     CALL DRAW_CHAR_AT
 
     LD HL,(SCORE)
-    LD BC,#020C                  ; 5 digits: 00000..65535
+    LD BC,#0210                  ; 5 digits: 00000..65535
     CALL PRINT_DEC5
 
     LD A,(SHIP_LIVES)
     ADD A,'0'
-    LD BC,#021B                  ; lives 0..9
+    LD BC,#021D                  ; lives 0..9
     JP DRAW_CHAR_AT
 
 ; IN HL=0..65535, BC=YX of leftmost digit.

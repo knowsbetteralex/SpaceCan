@@ -393,7 +393,7 @@ SCORE_TIER:        DB 0        ; SCORE / 1024 at last bonus
 HUD_DIRTY:         DB 1        ; numeric labels need redraw
 SPACE_HELD:        DB 0
 
-HUD_LABEL_TITLE:  DB "SPACE SODA",0
+HUD_LABEL_TITLE:  DB "SPACECAN: SPACE SODA",0
 HUD_LABEL_SPEED:  DB "SPEED",0
 HUD_LABEL_SCORE:  DB "SCORE",0
 HUD_LABEL_LIVES:  DB "LIVES",0
