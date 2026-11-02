@@ -1,15 +1,28 @@
 ; -------------------------------------------------------------
 ; Game objects are opaque. No backdrop saving or OR blending.
-; The old picture is erased to empty corridor cells, the moving
-; starfield will be drawn next, and then active objects drawn.
+ ; The old image contributes cells to the dirty queue. Opaque
+; object drawing happens after cleaning, moving stars are last.
 ; -------------------------------------------------------------
 
 DRAW_SHIP:
+    ; Select one of five 16x8 pictures without changing its X/Y.
+    ; Bank is a visual effect only: logical collision box is 2x1.
+    LD A,(SHIP_BANK)             ; 0..4
+    ADD A,A                      ; 2-byte DW address table
+    LD E,A
+    LD D,0
+    LD HL,SHIP_FRAMES
+    ADD HL,DE
+    LD E,(HL)
+    INC HL
+    LD D,(HL)                    ; DE -> 16-byte sprite
+    PUSH DE
+
     LD BC,(SHIP_NEW_POS)
     CALL GET_SCREEN_ADDR
     LD DE,SHIP_ATTR
     CALL RESTORE_ATTR_1_2
-    LD DE,SHIP_SPRITE
+    POP DE
     JP DRAW_1_2
 
 ERASE_SHIP:

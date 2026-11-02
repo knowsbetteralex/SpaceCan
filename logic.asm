@@ -8,31 +8,55 @@ READ_INPUT:
     CALL READ_FIRE_KEY
     RET
 
-; Ship is 16 pixels wide. Allowed left X = 6..24, Y fixed at 22.
+; Ship is 16 pixels wide, left X=6..24, fixed Y=22.
+; Five banking poses: 0=hard left, 1=soft left, 2=level,
+; 3=soft right, 4=hard right. Each frame moves one pose toward
+; the desired direction, including a gradual return to level.
 READ_SHIP_HORIZONTAL:
-    LD DE,(SHIP_NEW_POS)
+    LD A,(SHIP_NEW_POS)
+    LD E,A
     LD BC,#DFFE
     IN A,(C)
-    BIT 0,A                      ; P: right
+    BIT 0,A                       ; P moves right
     JR NZ,.CHECK_LEFT
     LD A,E
     CP 24
-    JR Z,.STORE
+    JR Z,.STOP
     INC E
-    JR .STORE
+    LD B,4                         ; target right bank
+    JR .APPLY
 .CHECK_LEFT:
-    BIT 1,A                      ; O: left
-    JR NZ,.STORE
+    BIT 1,A                       ; O moves left
+    JR NZ,.STOP
     LD A,E
     CP 6
-    JR Z,.STORE
+    JR Z,.STOP
     DEC E
-.STORE:
-    LD HL,(SHIP_NEW_POS)
-    LD (SHIP_NEW_POS),DE
-    XOR A
-    SBC HL,DE
+    LD B,0                         ; target left bank
+    JR .APPLY
+.STOP:
+    LD B,2                         ; level when motion stops
+
+.APPLY:
+    LD A,(SHIP_NEW_POS)
+    CP E
+    JR Z,.UPDATE_BANK
+    LD A,E
+    LD (SHIP_NEW_POS),A
+    LD A,1
+    LD (SHIP_DIRTY),A
+
+.UPDATE_BANK:
+    LD A,(SHIP_BANK)
+    CP B
     RET Z
+    JR C,.BANK_RIGHT
+    DEC A
+    JR .SAVE_BANK
+.BANK_RIGHT:
+    INC A
+.SAVE_BANK:
+    LD (SHIP_BANK),A
     LD A,1
     LD (SHIP_DIRTY),A
     RET

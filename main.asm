@@ -1,4 +1,4 @@
-; ZX Space Demo - Step 05.1: horizontally drifting 8x8 / 16x16 asteroids.
+; ZX Space Demo - Step 05.2: straight-falling random-X asteroids, ship banking.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Coordinates are in 8x8 character cells: X in low byte, Y in high byte.
@@ -13,12 +13,11 @@ PLAYFIELD_TOP        EQU 4
 MAX_BULLETS          EQU 6
 BULLET_SLOT_SIZE     EQU 8
 MAX_ENEMIES          EQU 4
-ENEMY_SLOT_SIZE      EQU 16
+ENEMY_SLOT_SIZE      EQU 13
 ENEMY_FRAME_DELAY    EQU 4
 ENEMY_RESPAWN_DELAY  EQU 24
-ENEMY_HORIZONTAL_DELAY EQU 3  ; horizontal step every 3 vertical moves
 
-; One 16-byte slot for opaque two-row asteroids; no saved background.
+; One 13-byte enemy slot: state + animation + last drawn position.
 E_ACTIVE       EQU 0
 E_TYPE         EQU 1           ; 0=8x16, 1=16x16
 E_HP           EQU 2
@@ -32,9 +31,6 @@ E_FRAME        EQU 9
 E_ANIM_TIMER   EQU 10
 E_RESPAWN      EQU 11
 E_PHASE        EQU 12          ; initial animation timer
-E_X_MIN        EQU 13          ; horizontal corridor: left edge
-E_X_MAX        EQU 14          ; rightmost allowed LEFT sprite cell
-E_X_DIR        EQU 15          ; 0=left, 1=right
 
     INCLUDE "diagnostics.asm"
 
@@ -85,6 +81,8 @@ START:
     LD HL,(SHIP_START_POS)
     LD (SHIP_CUR_POS),HL
     LD (SHIP_NEW_POS),HL
+    LD A,2
+    LD (SHIP_BANK),A
     XOR A
     LD (BLAST_TYPE),A
     LD HL,BLAST_FRAME_0

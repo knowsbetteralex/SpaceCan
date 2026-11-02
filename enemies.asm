@@ -1,19 +1,25 @@
 ; -------------------------------------------------------------
-; ENEMIES: four independently moving asteroids (8x8 and 16x16).
+; ENEMIES: four asteroids falling vertically (8x8 and 16x16).
 ;
-; IX -> current enemy slot in all *_ENEMY_SLOT routines.
-; Four disjoint horizontal movement zones prevent asteroid overlap.
+; IX -> current enemy slot. X is assigned at every spawn and
+; remains constant until deactivation; overlapping spawn positions
+; are rejected for objects currently occupying the entry rows.
 ; Game logic updates state/dirty; renderer stores drawn position.
 ; -------------------------------------------------------------
 
-; Initialise from ENEMY_START_TABLE: TYPE, X, Y, PHASE, MIN_X, MAX_X, DIR.
+; Initialise from ENEMY_START_TABLE: TYPE, START_Y, ANIM_PHASE.
 INIT_ENEMIES:
-    ; Reset all slot states even when game is restarted.
+    ; Reset all slots, including DRAWN and DIRTY flags.
     LD HL,ENEMY_POOL
     LD (HL),0
     LD DE,ENEMY_POOL+1
     LD BC,MAX_ENEMIES*ENEMY_SLOT_SIZE-1
     LDIR
+
+    ; Refresh register gives the first spawn sequence some variation.
+    LD A,R
+    OR 1
+    LD (ENEMY_RANDOM_STATE),A
 
     LD IX,ENEMY_POOL
     LD HL,ENEMY_START_TABLE
@@ -29,37 +35,30 @@ INIT_ENEMIES:
 .STORE_HP:
     LD (IX+E_HP),A
     LD A,(HL)
-    LD (IX+E_X),A
-    INC HL
-    LD A,(HL)
     LD (IX+E_Y),A
     INC HL
-    LD A,1
-    LD (IX+E_ACTIVE),A
-    LD (IX+E_DIRTY),A
-    ; Stagger the four independent animation timers (1..4).
     LD A,(HL)
     LD (IX+E_ANIM_TIMER),A
     LD (IX+E_PHASE),A
     INC HL
-    LD A,(HL)
-    LD (IX+E_X_MIN),A
-    INC HL
-    LD A,(HL)
-    LD (IX+E_X_MAX),A
-    INC HL
-    LD A,(HL)
-    LD (IX+E_X_DIR),A          ; 0=left, 1=right
-    INC HL
+
+    ; Every asteroid begins in a randomly selected vertical lane.
+    ; This test also avoids collisions with asteroids already at Y=4/5.
+    PUSH HL
+    PUSH BC
+    CALL SELECT_ENEMY_SPAWN_X
+    POP BC
+    POP HL
+    JR C,.SKIP_ACTIVE
+    LD A,1
+    LD (IX+E_ACTIVE),A
+    LD (IX+E_DIRTY),A
+.SKIP_ACTIVE:
     LD DE,ENEMY_SLOT_SIZE
     ADD IX,DE
     DJNZ .NEXT
     LD A,4
     LD (ENEMY_MOVE_TIMER),A
-    LD A,ENEMY_HORIZONTAL_DELAY
-    LD (ENEMY_HORIZONTAL_TIMER),A
-    XOR A
-    LD (ENEMY_HORIZONTAL_NOW),A
     RET
 
 ; Q/A speed 1..3 controls vertical move period: 4..2 game ticks.
@@ -74,22 +73,10 @@ UPDATE_ENEMIES:
     LD (ENEMY_MOVE_TIMER),A
     LD A,1
     LD (ENEMY_MOVE_NOW),A
-
-    ; A horizontal step occurs every third vertical move.
-    LD HL,ENEMY_HORIZONTAL_TIMER
-    DEC (HL)
-    JR NZ,.NO_HORIZONTAL
-    LD (HL),ENEMY_HORIZONTAL_DELAY
-    LD (ENEMY_HORIZONTAL_NOW),A
-    JR .PROCESS
-.NO_HORIZONTAL:
-    XOR A
-    LD (ENEMY_HORIZONTAL_NOW),A
     JR .PROCESS
 .NO_MOVE:
     XOR A
     LD (ENEMY_MOVE_NOW),A
-    LD (ENEMY_HORIZONTAL_NOW),A
 .PROCESS:
     LD IX,ENEMY_POOL
     LD B,MAX_ENEMIES
@@ -105,7 +92,7 @@ UPDATE_ENEMIES:
 UPDATE_ENEMY_SLOT:
     LD A,(IX+E_ACTIVE)
     OR A
-    JP Z,.INACTIVE      ; long jump: movement helpers are between
+    JP Z,.INACTIVE
 
     ; Independently animate four rotation frames.
     LD A,(IX+E_ANIM_TIMER)
@@ -139,7 +126,6 @@ UPDATE_ENEMY_SLOT:
     JP NC,DEACTIVATE_ENEMY
     INC A
     LD (IX+E_Y),A
-    CALL MOVE_ENEMY_HORIZONTAL
     LD A,1
     LD (IX+E_DIRTY),A
     RET
@@ -158,6 +144,8 @@ UPDATE_ENEMY_SLOT:
     RET NZ
     LD A,PLAYFIELD_TOP
     LD (IX+E_Y),A
+    CALL SELECT_ENEMY_SPAWN_X
+    RET C                      ; entry row blocked: retry next tick
     LD A,(IX+E_TYPE)
     OR A
     LD A,1
@@ -174,38 +162,158 @@ UPDATE_ENEMY_SLOT:
     LD (IX+E_DIRTY),A
     RET
 
-; Move one character sideways on selected vertical ticks.
-; Each object's X_MIN/X_MAX is its LEFTMOST sprite cell position.
-; If an edge is reached, reverse direction and step inward.
-; IN: IX=enemy. DESTROYS: AF. Preserves BC, DE, HL.
-MOVE_ENEMY_HORIZONTAL:
-    LD A,(ENEMY_HORIZONTAL_NOW)
+; -------------------------------------------------------------
+; SPAWN X: choose a fresh left edge across the whole 20-cell
+; corridor. Reject candidates intersecting another asteroid at
+; the entry row(s), then try the next X until a free one is found.
+; IX = the inactive/current slot; its logical Y is already set.
+; OUT: carry clear = X selected, carry set = all cells occupied.
+; Preserves BC, DE, HL and IX. Runs only on spawn, not each frame.
+; -------------------------------------------------------------
+SELECT_ENEMY_SPAWN_X:
+    PUSH BC
+    PUSH DE
+    PUSH HL
+
+    ; Number of possible LEFT coordinates:
+    ; small 8x8: X=6..25 (20); large 16x16: X=6..24 (19).
+    LD C,20
+    LD A,(IX+E_TYPE)
     OR A
-    RET Z
-    LD A,(IX+E_X_DIR)
+    JR Z,.PICK
+    DEC C
+.PICK:
+    CALL NEXT_ENEMY_RANDOM       ; A=0..255
+.MODULO:
+    CP C
+    JR C,.START_X
+    SUB C
+    JR .MODULO
+.START_X:
+    ADD A,6
+    LD (IX+E_X),A
+    LD B,20                     ; at most 20 candidate positions
+.TRY:
+    CALL ENEMY_SPAWN_CLEAR
+    JR NC,.SUCCESS
+
+    LD C,25
+    LD A,(IX+E_TYPE)
     OR A
-    JR Z,.LEFT
-.RIGHT:
+    JR Z,.STEP
+    DEC C                       ; large rightmost left-X is 24
+.STEP:
     LD A,(IX+E_X)
-    CP (IX+E_X_MAX)
-    JR C,.STEP_RIGHT
-    XOR A
-    LD (IX+E_X_DIR),A
-    JR .LEFT
-.STEP_RIGHT:
+    CP C
+    JR C,.INCREMENT
+    LD A,6
+    JR .SAVE_X
+.INCREMENT:
     INC A
+.SAVE_X:
     LD (IX+E_X),A
+    DJNZ .TRY
+    POP HL
+    POP DE
+    POP BC
+    SCF                         ; cannot spawn this tick
     RET
-.LEFT:
+.SUCCESS:
+    POP HL
+    POP DE
+    POP BC
+    OR A                        ; clear carry
+    RET
+
+; 8-bit maximal-length Galois LFSR, polynomial #1D.
+; A new X is chosen only on spawn. Never re-seed on respawn.
+NEXT_ENEMY_RANDOM:
+    LD A,(ENEMY_RANDOM_STATE)
+    ADD A,A
+    JR NC,.STORE
+    XOR #1D
+.STORE:
+    LD (ENEMY_RANDOM_STATE),A
+    RET
+
+; Current candidate is in (IX+E_X), new Y is PLAYFIELD_TOP.
+; A collision can only happen with an active asteroid whose top
+; currently occupies Y=4 or 5 (for a new 2-row large asteroid).
+; Carry set: candidate intersects an active asteroid.
+; Carry clear: new asteroid fits; preserves BC,DE,HL,IX.
+ENEMY_SPAWN_CLEAR:
+    PUSH BC
+    PUSH DE
+    PUSH IX
     LD A,(IX+E_X)
-    CP (IX+E_X_MIN)
-    JR NZ,.STEP_LEFT
-    LD A,1
-    LD (IX+E_X_DIR),A
-    JR .RIGHT
-.STEP_LEFT:
-    DEC A
-    LD (IX+E_X),A
+    LD (ENEMY_TEST_X),A
+    LD A,(IX+E_TYPE)
+    LD (ENEMY_TEST_TYPE),A
+    LD A,(IX+E_Y)
+    LD (ENEMY_TEST_Y),A
+    LD IX,ENEMY_POOL
+    LD B,MAX_ENEMIES
+.NEXT:
+    LD A,(IX+E_ACTIVE)
+    OR A
+    JR Z,.SKIP
+
+    ; Vertical interval overlap:
+    ; candidate_top <= existing_bottom, and
+    ; existing_top <= candidate_bottom.
+    LD A,(IX+E_Y)
+    LD C,A
+    LD A,(IX+E_TYPE)
+    ADD A,C                    ; existing bottom Y
+    LD C,A
+    LD A,(ENEMY_TEST_Y)
+    CP C
+    JR C,.OTHER_SIDE
+    JR Z,.OTHER_SIDE
+    JR .SKIP
+.OTHER_SIDE:
+    LD A,(ENEMY_TEST_Y)
+    LD C,A
+    LD A,(ENEMY_TEST_TYPE)
+    ADD A,C                    ; candidate bottom Y
+    LD C,A
+    LD A,(IX+E_Y)
+    CP C
+    JR C,.CHECK_X
+    JR NZ,.SKIP
+.CHECK_X:
+    ; candidate_right < existing_left => no horizontal overlap
+    LD A,(ENEMY_TEST_X)
+    LD C,A
+    LD A,(ENEMY_TEST_TYPE)
+    ADD A,C
+    CP (IX+E_X)
+    JR C,.SKIP
+
+    ; existing_right < candidate_left => no overlap
+    LD A,(IX+E_X)
+    LD C,A
+    LD A,(IX+E_TYPE)
+    ADD A,C
+    LD C,A
+    LD A,(ENEMY_TEST_X)
+    CP C
+    JR C,.BLOCKED
+    JR Z,.BLOCKED
+.SKIP:
+    LD DE,ENEMY_SLOT_SIZE
+    ADD IX,DE
+    DJNZ .NEXT
+    POP IX
+    POP DE
+    POP BC
+    XOR A
+    RET
+.BLOCKED:
+    POP IX
+    POP DE
+    POP BC
+    SCF
     RET
 
 ; IX -> enemy. Its drawn image will be erased by renderer.

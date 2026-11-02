@@ -9,46 +9,96 @@ BG_ATTR_PAIR:
 SHIP_START_POS:
     DB 15,22
 
+SHIP_FRAMES:
+    ; Bank poses 0..4: hard-left, left, level, right, hard-right.
+    DW SHIP_BANK_LEFT_HARD,SHIP_BANK_LEFT_SOFT,SHIP_SPRITE
+    DW SHIP_BANK_RIGHT_SOFT,SHIP_BANK_RIGHT_HARD
+
+SHIP_BANK_LEFT_HARD:
+    DB #06,#00
+    DB #0F,#00
+    DB #3F,#C0
+    DB #7F,#F8
+    DB #FF,#FC
+    DB #7F,#78
+    DB #39,#C0
+    DB #11,#00
+
+SHIP_BANK_LEFT_SOFT:
+    DB #03,#00
+    DB #07,#80
+    DB #1F,#E0
+    DB #3F,#FC
+    DB #7F,#FE
+    DB #3E,#FC
+    DB #19,#98
+    DB #08,#10
+
 SHIP_SPRITE:
     DB #01,#80
     DB #03,#C0
     DB #1F,#F8
     DB #7F,#FE
     DB #FF,#FF
-    DB #ED,#B7
+    DB #EF,#6F
     DB #44,#22
-    DB #04,#20
+    DB #04,#08
+
+SHIP_BANK_RIGHT_SOFT:
+    DB #00,#C0
+    DB #01,#E0
+    DB #07,#F8
+    DB #3F,#FC
+    DB #7F,#FE
+    DB #3F,#7C
+    DB #19,#98
+    DB #08,#10
+
+SHIP_BANK_RIGHT_HARD:
+    DB #00,#60
+    DB #00,#F0
+    DB #03,#FC
+    DB #1F,#FE
+    DB #3F,#FF
+    DB #1E,#FE
+    DB #03,#9C
+    DB #00,#88
+
 SHIP_ATTR:
     DB #46,#46                 ; bright yellow on black
 SHIP_CUR_POS:
     DB 15,22                   ; last painted position
 SHIP_NEW_POS:
     DB 15,22                   ; logical target
+SHIP_BANK:
+    DB 2                         ; 0..4, neutral = 2
 SHIP_DRAWN:
     DB 0
 
 SHIP_HP:
     DB 100                      ; 100 -> 75 -> 50 -> 25 -> 0
 
-; Four fixed lanes; no two enemies intersect horizontally.
+; Four independent falling objects. On EVERY spawn, X is
+; freshly selected in the full corridor using an 8-bit LFSR.
+; The initial table stores only TYPE, START_Y, ANIMATION_PHASE.
 ENEMY_START_TABLE:
-    ; TYPE, X, Y, ANIMATION_PHASE, X_MIN, X_MAX, DIRECTION.
-    ; Direction: 0=left, 1=right.
-    ; Separate, non-overlapping corridors for four asteroids:
-    ; small A occupies X=7..10; large B occupies X=12..16;
-    ; small C occupies X=18..21; large D occupies X=23..25.
-    DB 0,8,4,1,7,10,0           ; small, initially moving left
-    DB 1,12,11,2,12,15,1        ; large, initially moving right
-    DB 0,19,5,3,18,21,1         ; small, initially moving right
-    DB 1,23,16,4,23,24,1        ; large, initially moving right
+    DB 0,4,1                    ; small 8x8, starts in top row
+    DB 1,11,2                   ; large 16x16
+    DB 0,5,3                    ; small 8x8
+    DB 1,16,4                   ; large 16x16
 
 ENEMY_MOVE_TIMER:
     DB 4
 ENEMY_MOVE_NOW:
     DB 0
-ENEMY_HORIZONTAL_TIMER:
-    DB ENEMY_HORIZONTAL_DELAY
-ENEMY_HORIZONTAL_NOW:
+
+ENEMY_RANDOM_STATE:
+    DB #A7                      ; reseeded by LD A,R during startup
+ENEMY_TEST_X:
+    DB 0                        ; temporary spawn-overlap data
+ENEMY_TEST_TYPE:
+    DB 0
+ENEMY_TEST_Y:
     DB 0
 
 ENEMY_POOL:
