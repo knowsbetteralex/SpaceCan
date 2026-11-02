@@ -1,4 +1,4 @@
-; ZX Space Demo - Step 05: four-row tiled cockpit and side hull.
+; ZX Space Demo - Step 05.1: horizontally drifting 8x8 / 16x16 asteroids.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Coordinates are in 8x8 character cells: X in low byte, Y in high byte.
@@ -16,6 +16,7 @@ MAX_ENEMIES          EQU 4
 ENEMY_SLOT_SIZE      EQU 16
 ENEMY_FRAME_DELAY    EQU 4
 ENEMY_RESPAWN_DELAY  EQU 24
+ENEMY_HORIZONTAL_DELAY EQU 3  ; horizontal step every 3 vertical moves
 
 ; One 16-byte slot for opaque two-row asteroids; no saved background.
 E_ACTIVE       EQU 0
@@ -30,7 +31,10 @@ E_DIRTY        EQU 8
 E_FRAME        EQU 9
 E_ANIM_TIMER   EQU 10
 E_RESPAWN      EQU 11
-E_PHASE        EQU 12          ; first animation timer value
+E_PHASE        EQU 12          ; initial animation timer
+E_X_MIN        EQU 13          ; horizontal corridor: left edge
+E_X_MAX        EQU 14          ; rightmost allowed LEFT sprite cell
+E_X_DIR        EQU 15          ; 0=left, 1=right
 
     INCLUDE "diagnostics.asm"
 

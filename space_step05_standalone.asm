@@ -1,5 +1,5 @@
 ; ===== main.asm =====
-; ZX Space Demo - Step 05: four-row tiled cockpit and side hull.
+; ZX Space Demo - Step 05.1: horizontally drifting 8x8 / 16x16 asteroids.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Coordinates are in 8x8 character cells: X in low byte, Y in high byte.
@@ -17,6 +17,7 @@ MAX_ENEMIES          EQU 4
 ENEMY_SLOT_SIZE      EQU 16
 ENEMY_FRAME_DELAY    EQU 4
 ENEMY_RESPAWN_DELAY  EQU 24
+ENEMY_HORIZONTAL_DELAY EQU 3  ; horizontal step every 3 vertical moves
 
 ; One 16-byte slot for opaque two-row asteroids; no saved background.
 E_ACTIVE       EQU 0
@@ -31,7 +32,10 @@ E_DIRTY        EQU 8
 E_FRAME        EQU 9
 E_ANIM_TIMER   EQU 10
 E_RESPAWN      EQU 11
-E_PHASE        EQU 12          ; first animation timer value
+E_PHASE        EQU 12          ; initial animation timer
+E_X_MIN        EQU 13          ; horizontal corridor: left edge
+E_X_MAX        EQU 14          ; rightmost allowed LEFT sprite cell
+E_X_DIR        EQU 15          ; 0=left, 1=right
 
 ; -------------------------------------------------------------
 ; Border phase diagnostics for ZX Spectrum 48K.
@@ -519,14 +523,14 @@ ERASE_BULLET_SLOT:
 
 ; ===== enemies.asm =====
 ; -------------------------------------------------------------
-; ENEMIES: four independent asteroids (8x16 and 16x16).
+; ENEMIES: four independently moving asteroids (8x8 and 16x16).
 ;
 ; IX -> current enemy slot in all *_ENEMY_SLOT routines.
-; Four fixed lanes never overlap each other.
+; Four disjoint horizontal movement zones prevent asteroid overlap.
 ; Game logic updates state/dirty; renderer stores drawn position.
 ; -------------------------------------------------------------
 
-; Initialise four slots from ENEMY_START_TABLE: TYPE, X, Y, PHASE.
+; Initialise from ENEMY_START_TABLE: TYPE, X, Y, PHASE, MIN_X, MAX_X, DIR.
 INIT_ENEMIES:
     ; Reset all slot states even when game is restarted.
     LD HL,ENEMY_POOL
@@ -562,14 +566,27 @@ INIT_ENEMIES:
     LD (IX+E_ANIM_TIMER),A
     LD (IX+E_PHASE),A
     INC HL
+    LD A,(HL)
+    LD (IX+E_X_MIN),A
+    INC HL
+    LD A,(HL)
+    LD (IX+E_X_MAX),A
+    INC HL
+    LD A,(HL)
+    LD (IX+E_X_DIR),A          ; 0=left, 1=right
+    INC HL
     LD DE,ENEMY_SLOT_SIZE
     ADD IX,DE
     DJNZ .NEXT
     LD A,4
     LD (ENEMY_MOVE_TIMER),A
+    LD A,ENEMY_HORIZONTAL_DELAY
+    LD (ENEMY_HORIZONTAL_TIMER),A
+    XOR A
+    LD (ENEMY_HORIZONTAL_NOW),A
     RET
 
-; Q/A speed 1..4 controls move period: 4..1 game ticks.
+; Q/A speed 1..3 controls vertical move period: 4..2 game ticks.
 UPDATE_ENEMIES:
     LD A,(ENEMY_MOVE_TIMER)
     DEC A
@@ -581,10 +598,22 @@ UPDATE_ENEMIES:
     LD (ENEMY_MOVE_TIMER),A
     LD A,1
     LD (ENEMY_MOVE_NOW),A
+
+    ; A horizontal step occurs every third vertical move.
+    LD HL,ENEMY_HORIZONTAL_TIMER
+    DEC (HL)
+    JR NZ,.NO_HORIZONTAL
+    LD (HL),ENEMY_HORIZONTAL_DELAY
+    LD (ENEMY_HORIZONTAL_NOW),A
+    JR .PROCESS
+.NO_HORIZONTAL:
+    XOR A
+    LD (ENEMY_HORIZONTAL_NOW),A
     JR .PROCESS
 .NO_MOVE:
     XOR A
     LD (ENEMY_MOVE_NOW),A
+    LD (ENEMY_HORIZONTAL_NOW),A
 .PROCESS:
     LD IX,ENEMY_POOL
     LD B,MAX_ENEMIES
@@ -600,9 +629,9 @@ UPDATE_ENEMIES:
 UPDATE_ENEMY_SLOT:
     LD A,(IX+E_ACTIVE)
     OR A
-    JR Z,.INACTIVE
+    JP Z,.INACTIVE      ; long jump: movement helpers are between
 
-    ; Independently animate two rotation frames.
+    ; Independently animate four rotation frames.
     LD A,(IX+E_ANIM_TIMER)
     DEC A
     LD (IX+E_ANIM_TIMER),A
@@ -610,7 +639,8 @@ UPDATE_ENEMY_SLOT:
     LD A,ENEMY_FRAME_DELAY
     LD (IX+E_ANIM_TIMER),A
     LD A,(IX+E_FRAME)
-    XOR 1
+    INC A
+    AND 3
     LD (IX+E_FRAME),A
     LD A,1
     LD (IX+E_DIRTY),A
@@ -618,11 +648,22 @@ UPDATE_ENEMY_SLOT:
     LD A,(ENEMY_MOVE_NOW)
     OR A
     RET Z
+    ; Large 2-row sprite must stop at Y=22 (last bitmap row 23).
+    ; Small 1-row sprite may reach Y=23 before disappearing.
     LD A,(IX+E_Y)
-    CP 22                       ; ship row is Y=22
+    LD C,23
+    LD D,A
+    LD A,(IX+E_TYPE)
+    OR A
+    JR Z,.CHECK_BOTTOM
+    LD C,22
+.CHECK_BOTTOM:
+    LD A,D
+    CP C
     JP NC,DEACTIVATE_ENEMY
     INC A
     LD (IX+E_Y),A
+    CALL MOVE_ENEMY_HORIZONTAL
     LD A,1
     LD (IX+E_DIRTY),A
     RET
@@ -655,6 +696,40 @@ UPDATE_ENEMY_SLOT:
     LD A,1
     LD (IX+E_ACTIVE),A
     LD (IX+E_DIRTY),A
+    RET
+
+; Move one character sideways on selected vertical ticks.
+; Each object's X_MIN/X_MAX is its LEFTMOST sprite cell position.
+; If an edge is reached, reverse direction and step inward.
+; IN: IX=enemy. DESTROYS: AF. Preserves BC, DE, HL.
+MOVE_ENEMY_HORIZONTAL:
+    LD A,(ENEMY_HORIZONTAL_NOW)
+    OR A
+    RET Z
+    LD A,(IX+E_X_DIR)
+    OR A
+    JR Z,.LEFT
+.RIGHT:
+    LD A,(IX+E_X)
+    CP (IX+E_X_MAX)
+    JR C,.STEP_RIGHT
+    XOR A
+    LD (IX+E_X_DIR),A
+    JR .LEFT
+.STEP_RIGHT:
+    INC A
+    LD (IX+E_X),A
+    RET
+.LEFT:
+    LD A,(IX+E_X)
+    CP (IX+E_X_MIN)
+    JR NZ,.STEP_LEFT
+    LD A,1
+    LD (IX+E_X_DIR),A
+    JR .RIGHT
+.STEP_LEFT:
+    DEC A
+    LD (IX+E_X),A
     RET
 
 ; IX -> enemy. Its drawn image will be erased by renderer.
@@ -704,11 +779,18 @@ CHECK_SHIP_ENEMY_SLOT:
     LD A,(IX+E_ACTIVE)
     OR A
     RET Z
-    ; Ship may touch the top or bottom asteroid cell row.
+    ; Small asteroid occupies only Y; large occupies Y and Y+1.
     LD A,(SHIP_NEW_POS+1)
     SUB (IX+E_Y)
-    CP 2
-    RET NC
+    JR C,.NO_HIT
+    OR A
+    JR Z,.CHECK_X
+    CP 1
+    JR NZ,.NO_HIT
+    LD A,(IX+E_TYPE)
+    OR A
+    JR Z,.NO_HIT
+.CHECK_X:
     LD A,(SHIP_NEW_POS)
     LD C,A                       ; ship left column
     LD A,(IX+E_X)
@@ -735,6 +817,8 @@ CHECK_SHIP_ENEMY_SLOT:
     LD A,1
     LD (HUD_DIRTY),A
     RET
+.NO_HIT:
+    RET
 
 ; IN: IX=bullet; OUT: carry set iff bullet consumed.
 ; Preserves IX for caller and all bullet-specific procedures.
@@ -748,11 +832,18 @@ CHECK_BULLET_ENEMIES:
     LD A,(IX+E_ACTIVE)
     OR A
     JR Z,.SKIP
-    ; Compare both cell rows Y and Y+1, without tunnelling.
+    ; Only large asteroids occupy two character rows.
     LD A,B
     SUB (IX+E_Y)
-    CP 2
-    JR NC,.SKIP
+    JR C,.SKIP
+    OR A
+    JR Z,.CHECK_X
+    CP 1
+    JR NZ,.SKIP
+    LD A,(IX+E_TYPE)
+    OR A
+    JR Z,.SKIP
+.CHECK_X:
     LD A,C
     SUB (IX+E_X)              ; unsigned delta bulletX - enemyX
     JR C,.SKIP
@@ -819,13 +910,14 @@ RENDER_DRAW_ENEMIES:
     DJNZ .NEXT
     RET
 
-; Frame table order: small0, small1, large0, large1.
+; Frame table: small0..3, large0..3 (DW pointers).
 ; OUT: DE=bitmap address. IX and BC preserved.
 GET_ENEMY_FRAME:
     LD A,(IX+E_TYPE)
     ADD A,A
+    ADD A,A                    ; TYPE*4 (four frames per type)
     ADD A,(IX+E_FRAME)
-    ADD A,A
+    ADD A,A                    ; two bytes per table entry
     LD E,A
     LD D,0
     LD HL,ENEMY_FRAMES
@@ -836,7 +928,8 @@ GET_ENEMY_FRAME:
     RET
 
 ; -------------------------------------------------------------
-; Asteroids occupy two 8-pixel high character rows.
+; Small asteroid occupies one 8x8 cell.
+; Large asteroid occupies two rows of two cells (16x16).
 ; Direct bitmap copy, no saved background and no OR blending.
 ; -------------------------------------------------------------
 
@@ -889,8 +982,12 @@ DRAW_ENEMY_ROW:
 DRAW_ENEMY_SLOT:
     XOR A
     CALL DRAW_ENEMY_ROW
+    LD A,(IX+E_TYPE)
+    OR A
+    JR Z,.SINGLE_ROW
     LD A,1
     CALL DRAW_ENEMY_ROW
+.SINGLE_ROW:
     LD A,(IX+E_X)
     LD (IX+E_DRAW_X),A
     LD A,(IX+E_Y)
@@ -899,15 +996,15 @@ DRAW_ENEMY_SLOT:
     LD (IX+E_DRAWN),A
     RET
 
-; No writes to screen here: collect the old 1x2 / 2x2 rectangle.
+; No writes to screen: collect old 1x1 / 2x2 rectangle.
 ERASE_ENEMY_SLOT:
     LD B,(IX+E_DRAW_Y)
     LD C,(IX+E_DRAW_X)
-    LD DE,#0102                  ; D=width, E=height
+    LD DE,#0101                  ; small = width 1, height 1
     LD A,(IX+E_TYPE)
     OR A
     JR Z,.MARK
-    LD D,2
+    LD DE,#0202                  ; large = width 2, height 2
 .MARK:
     CALL STARFIELD_MARK_RECT
     XOR A
@@ -1191,11 +1288,11 @@ STARFIELD_INVALIDATE_FOREGROUND:
     JR Z,.SKIP_ENEMY
     LD B,(IX+E_DRAW_Y)
     LD C,(IX+E_DRAW_X)
-    LD DE,#0102              ; one cell wide, two tall
+    LD DE,#0101              ; small asteroid = one 8x8 cell
     LD A,(IX+E_TYPE)
     OR A
     JR Z,.ENEMY_RECT
-    LD D,2
+    LD DE,#0202              ; large asteroid = 2x2 cells
 .ENEMY_RECT:
     CALL STARFIELD_TEST_RECT
     OR A
@@ -1919,15 +2016,23 @@ SHIP_HP:
 
 ; Four fixed lanes; no two enemies intersect horizontally.
 ENEMY_START_TABLE:
-    ; TYPE, X, Y, initial animation timer (1..4).
-    DB 0,8,4,1                  ; small, phase 1
-    DB 1,12,11,2                ; large, phase 2
-    DB 0,19,5,3                 ; small, phase 3
-    DB 1,23,16,4                ; large, phase 4
+    ; TYPE, X, Y, ANIMATION_PHASE, X_MIN, X_MAX, DIRECTION.
+    ; Direction: 0=left, 1=right.
+    ; Separate, non-overlapping corridors for four asteroids:
+    ; small A occupies X=7..10; large B occupies X=12..16;
+    ; small C occupies X=18..21; large D occupies X=23..25.
+    DB 0,8,4,1,7,10,0           ; small, initially moving left
+    DB 1,12,11,2,12,15,1        ; large, initially moving right
+    DB 0,19,5,3,18,21,1         ; small, initially moving right
+    DB 1,23,16,4,23,24,1        ; large, initially moving right
 
 ENEMY_MOVE_TIMER:
     DB 4
 ENEMY_MOVE_NOW:
+    DB 0
+ENEMY_HORIZONTAL_TIMER:
+    DB ENEMY_HORIZONTAL_DELAY
+ENEMY_HORIZONTAL_NOW:
     DB 0
 
 ENEMY_POOL:
@@ -1939,82 +2044,123 @@ ENEMY_ATTR_LARGE:
     DB #45,#45                  ; bright cyan
 
 ENEMY_FRAMES:
-    DW ENEMY_SMALL_0,ENEMY_SMALL_1
-    DW ENEMY_LARGE_0,ENEMY_LARGE_1
+    ; 4 rotation frames per type, each 90 degrees clockwise.
+    DW ENEMY_SMALL_0,ENEMY_SMALL_1,ENEMY_SMALL_2,ENEMY_SMALL_3
+    DW ENEMY_LARGE_0,ENEMY_LARGE_1,ENEMY_LARGE_2,ENEMY_LARGE_3
 
-; Every frame is two character rows high (top then bottom).
-; Small frame: 16 bytes = 1x2. Large frame: 32 bytes = 2x2.
+; Small 8x8: 8 bytes/frame. Large 16x16: 32 bytes/frame.
+; No masking or backdrop saving; sprites draw opaque.
 ENEMY_SMALL_0:
-    DB %00000000
-    DB %00011000
-    DB %00111100
-    DB %01111110
-    DB %01110110
+    DB %00011100
+    DB %00111110
     DB %11111111
-    DB %11011111
     DB %11110111
-    DB %11111111
-    DB %11101111
-    DB %01111110
-    DB %01111010
-    DB %00111100
-    DB %00111100
-    DB %00011000
-    DB %00000000
+    DB %11111110
+    DB %00111111
+    DB %00001110
+    DB %00000100
 
 ENEMY_SMALL_1:
-    DB %00000000
-    DB %00001100
-    DB %00111110
-    DB %01111110
-    DB %01101111
-    DB %11111111
-    DB %11110111
-    DB %11011111
-    DB %11111110
-    DB %11101110
-    DB %01111110
-    DB %01011100
-    DB %00111100
     DB %00011100
-    DB %00011000
-    DB %00000000
+    DB %00011100
+    DB %00111110
+    DB %00111111
+    DB %01110111
+    DB %11111111
+    DB %01111110
+    DB %00101100
+
+ENEMY_SMALL_2:
+    DB %00100000
+    DB %01110000
+    DB %11111100
+    DB %01111111
+    DB %11101111
+    DB %11111111
+    DB %01111100
+    DB %00111000
+
+ENEMY_SMALL_3:
+    DB %00110100
+    DB %01111110
+    DB %11111111
+    DB %11101110
+    DB %11111100
+    DB %01111100
+    DB %00111000
+    DB %00111000
 
 ENEMY_LARGE_0:
-    DB #00,#00
-    DB #00,#C0
-    DB #03,#F0
-    DB #0F,#FC
-    DB #1F,#FE
+    DB #01,#E0
+    DB #07,#F8
+    DB #1F,#FC
+    DB #3F,#FE
     DB #3F,#FF
     DB #7F,#FF
-    DB #7B,#EF
+    DB #FB,#FF
+    DB #FF,#FE
     DB #FF,#FF
-    DB #EF,#BF
-    DB #FF,#FF
-    DB #7F,#FE
+    DB #FF,#FC
+    DB #7F,#F8
+    DB #77,#F8
     DB #3F,#FC
-    DB #1F,#F8
-    DB #07,#E0
-    DB #01,#80
+    DB #1F,#F0
+    DB #07,#C0
+    DB #03,#80
 
 ENEMY_LARGE_1:
-    DB #00,#00
-    DB #01,#80
-    DB #07,#E0
+    DB #03,#C0
+    DB #0F,#E0
     DB #1F,#F8
     DB #3F,#FC
-    DB #7F,#FE
+    DB #37,#FC
+    DB #7F,#BE
+    DB #FF,#FE
     DB #FF,#FF
-    DB #FD,#DF
-    DB #F7,#EF
     DB #FF,#FF
-    DB #FB,#DF
-    DB #7F,#FE
+    DB #7F,#FF
+    DB #3F,#FF
+    DB #3F,#FE
+    DB #1F,#FE
+    DB #13,#FC
+    DB #01,#F8
+    DB #01,#70
+
+ENEMY_LARGE_2:
+    DB #01,#C0
+    DB #03,#E0
+    DB #0F,#F8
     DB #3F,#FC
-    DB #0F,#F0
+    DB #1F,#EE
+    DB #1F,#FE
+    DB #3F,#FF
+    DB #FF,#FF
+    DB #7F,#FF
+    DB #FF,#DF
+    DB #FF,#FE
+    DB #FF,#FC
+    DB #7F,#FC
+    DB #3F,#F8
+    DB #1F,#E0
+    DB #07,#80
+
+ENEMY_LARGE_3:
+    DB #0E,#80
+    DB #1F,#80
+    DB #3F,#C8
+    DB #7F,#F8
+    DB #7F,#FC
+    DB #FF,#FC
+    DB #FF,#FE
+    DB #FF,#FF
+    DB #FF,#FF
+    DB #7F,#FF
+    DB #7D,#FE
+    DB #3F,#EC
+    DB #3F,#FC
+    DB #1F,#F8
+    DB #07,#F0
     DB #03,#C0
-    DB #00,#00
 
 BULLET_COUNT:
     DB 0                        ; active bullets (0..6)

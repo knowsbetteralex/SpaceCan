@@ -274,11 +274,11 @@ STARFIELD_INVALIDATE_FOREGROUND:
     JR Z,.SKIP_ENEMY
     LD B,(IX+E_DRAW_Y)
     LD C,(IX+E_DRAW_X)
-    LD DE,#0102              ; one cell wide, two tall
+    LD DE,#0101              ; small asteroid = one 8x8 cell
     LD A,(IX+E_TYPE)
     OR A
     JR Z,.ENEMY_RECT
-    LD D,2
+    LD DE,#0202              ; large asteroid = 2x2 cells
 .ENEMY_RECT:
     CALL STARFIELD_TEST_RECT
     OR A

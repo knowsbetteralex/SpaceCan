@@ -1,12 +1,12 @@
 ; -------------------------------------------------------------
-; ENEMIES: four independent asteroids (8x16 and 16x16).
+; ENEMIES: four independently moving asteroids (8x8 and 16x16).
 ;
 ; IX -> current enemy slot in all *_ENEMY_SLOT routines.
-; Four fixed lanes never overlap each other.
+; Four disjoint horizontal movement zones prevent asteroid overlap.
 ; Game logic updates state/dirty; renderer stores drawn position.
 ; -------------------------------------------------------------
 
-; Initialise four slots from ENEMY_START_TABLE: TYPE, X, Y, PHASE.
+; Initialise from ENEMY_START_TABLE: TYPE, X, Y, PHASE, MIN_X, MAX_X, DIR.
 INIT_ENEMIES:
     ; Reset all slot states even when game is restarted.
     LD HL,ENEMY_POOL
@@ -42,14 +42,27 @@ INIT_ENEMIES:
     LD (IX+E_ANIM_TIMER),A
     LD (IX+E_PHASE),A
     INC HL
+    LD A,(HL)
+    LD (IX+E_X_MIN),A
+    INC HL
+    LD A,(HL)
+    LD (IX+E_X_MAX),A
+    INC HL
+    LD A,(HL)
+    LD (IX+E_X_DIR),A          ; 0=left, 1=right
+    INC HL
     LD DE,ENEMY_SLOT_SIZE
     ADD IX,DE
     DJNZ .NEXT
     LD A,4
     LD (ENEMY_MOVE_TIMER),A
+    LD A,ENEMY_HORIZONTAL_DELAY
+    LD (ENEMY_HORIZONTAL_TIMER),A
+    XOR A
+    LD (ENEMY_HORIZONTAL_NOW),A
     RET
 
-; Q/A speed 1..4 controls move period: 4..1 game ticks.
+; Q/A speed 1..3 controls vertical move period: 4..2 game ticks.
 UPDATE_ENEMIES:
     LD A,(ENEMY_MOVE_TIMER)
     DEC A
@@ -61,10 +74,22 @@ UPDATE_ENEMIES:
     LD (ENEMY_MOVE_TIMER),A
     LD A,1
     LD (ENEMY_MOVE_NOW),A
+
+    ; A horizontal step occurs every third vertical move.
+    LD HL,ENEMY_HORIZONTAL_TIMER
+    DEC (HL)
+    JR NZ,.NO_HORIZONTAL
+    LD (HL),ENEMY_HORIZONTAL_DELAY
+    LD (ENEMY_HORIZONTAL_NOW),A
+    JR .PROCESS
+.NO_HORIZONTAL:
+    XOR A
+    LD (ENEMY_HORIZONTAL_NOW),A
     JR .PROCESS
 .NO_MOVE:
     XOR A
     LD (ENEMY_MOVE_NOW),A
+    LD (ENEMY_HORIZONTAL_NOW),A
 .PROCESS:
     LD IX,ENEMY_POOL
     LD B,MAX_ENEMIES
@@ -80,9 +105,9 @@ UPDATE_ENEMIES:
 UPDATE_ENEMY_SLOT:
     LD A,(IX+E_ACTIVE)
     OR A
-    JR Z,.INACTIVE
+    JP Z,.INACTIVE      ; long jump: movement helpers are between
 
-    ; Independently animate two rotation frames.
+    ; Independently animate four rotation frames.
     LD A,(IX+E_ANIM_TIMER)
     DEC A
     LD (IX+E_ANIM_TIMER),A
@@ -90,7 +115,8 @@ UPDATE_ENEMY_SLOT:
     LD A,ENEMY_FRAME_DELAY
     LD (IX+E_ANIM_TIMER),A
     LD A,(IX+E_FRAME)
-    XOR 1
+    INC A
+    AND 3
     LD (IX+E_FRAME),A
     LD A,1
     LD (IX+E_DIRTY),A
@@ -98,11 +124,22 @@ UPDATE_ENEMY_SLOT:
     LD A,(ENEMY_MOVE_NOW)
     OR A
     RET Z
+    ; Large 2-row sprite must stop at Y=22 (last bitmap row 23).
+    ; Small 1-row sprite may reach Y=23 before disappearing.
     LD A,(IX+E_Y)
-    CP 22                       ; ship row is Y=22
+    LD C,23
+    LD D,A
+    LD A,(IX+E_TYPE)
+    OR A
+    JR Z,.CHECK_BOTTOM
+    LD C,22
+.CHECK_BOTTOM:
+    LD A,D
+    CP C
     JP NC,DEACTIVATE_ENEMY
     INC A
     LD (IX+E_Y),A
+    CALL MOVE_ENEMY_HORIZONTAL
     LD A,1
     LD (IX+E_DIRTY),A
     RET
@@ -135,6 +172,40 @@ UPDATE_ENEMY_SLOT:
     LD A,1
     LD (IX+E_ACTIVE),A
     LD (IX+E_DIRTY),A
+    RET
+
+; Move one character sideways on selected vertical ticks.
+; Each object's X_MIN/X_MAX is its LEFTMOST sprite cell position.
+; If an edge is reached, reverse direction and step inward.
+; IN: IX=enemy. DESTROYS: AF. Preserves BC, DE, HL.
+MOVE_ENEMY_HORIZONTAL:
+    LD A,(ENEMY_HORIZONTAL_NOW)
+    OR A
+    RET Z
+    LD A,(IX+E_X_DIR)
+    OR A
+    JR Z,.LEFT
+.RIGHT:
+    LD A,(IX+E_X)
+    CP (IX+E_X_MAX)
+    JR C,.STEP_RIGHT
+    XOR A
+    LD (IX+E_X_DIR),A
+    JR .LEFT
+.STEP_RIGHT:
+    INC A
+    LD (IX+E_X),A
+    RET
+.LEFT:
+    LD A,(IX+E_X)
+    CP (IX+E_X_MIN)
+    JR NZ,.STEP_LEFT
+    LD A,1
+    LD (IX+E_X_DIR),A
+    JR .RIGHT
+.STEP_LEFT:
+    DEC A
+    LD (IX+E_X),A
     RET
 
 ; IX -> enemy. Its drawn image will be erased by renderer.
@@ -184,11 +255,18 @@ CHECK_SHIP_ENEMY_SLOT:
     LD A,(IX+E_ACTIVE)
     OR A
     RET Z
-    ; Ship may touch the top or bottom asteroid cell row.
+    ; Small asteroid occupies only Y; large occupies Y and Y+1.
     LD A,(SHIP_NEW_POS+1)
     SUB (IX+E_Y)
-    CP 2
-    RET NC
+    JR C,.NO_HIT
+    OR A
+    JR Z,.CHECK_X
+    CP 1
+    JR NZ,.NO_HIT
+    LD A,(IX+E_TYPE)
+    OR A
+    JR Z,.NO_HIT
+.CHECK_X:
     LD A,(SHIP_NEW_POS)
     LD C,A                       ; ship left column
     LD A,(IX+E_X)
@@ -215,6 +293,8 @@ CHECK_SHIP_ENEMY_SLOT:
     LD A,1
     LD (HUD_DIRTY),A
     RET
+.NO_HIT:
+    RET
 
 ; IN: IX=bullet; OUT: carry set iff bullet consumed.
 ; Preserves IX for caller and all bullet-specific procedures.
@@ -228,11 +308,18 @@ CHECK_BULLET_ENEMIES:
     LD A,(IX+E_ACTIVE)
     OR A
     JR Z,.SKIP
-    ; Compare both cell rows Y and Y+1, without tunnelling.
+    ; Only large asteroids occupy two character rows.
     LD A,B
     SUB (IX+E_Y)
-    CP 2
-    JR NC,.SKIP
+    JR C,.SKIP
+    OR A
+    JR Z,.CHECK_X
+    CP 1
+    JR NZ,.SKIP
+    LD A,(IX+E_TYPE)
+    OR A
+    JR Z,.SKIP
+.CHECK_X:
     LD A,C
     SUB (IX+E_X)              ; unsigned delta bulletX - enemyX
     JR C,.SKIP
@@ -299,13 +386,14 @@ RENDER_DRAW_ENEMIES:
     DJNZ .NEXT
     RET
 
-; Frame table order: small0, small1, large0, large1.
+; Frame table: small0..3, large0..3 (DW pointers).
 ; OUT: DE=bitmap address. IX and BC preserved.
 GET_ENEMY_FRAME:
     LD A,(IX+E_TYPE)
     ADD A,A
+    ADD A,A                    ; TYPE*4 (four frames per type)
     ADD A,(IX+E_FRAME)
-    ADD A,A
+    ADD A,A                    ; two bytes per table entry
     LD E,A
     LD D,0
     LD HL,ENEMY_FRAMES
@@ -316,7 +404,8 @@ GET_ENEMY_FRAME:
     RET
 
 ; -------------------------------------------------------------
-; Asteroids occupy two 8-pixel high character rows.
+; Small asteroid occupies one 8x8 cell.
+; Large asteroid occupies two rows of two cells (16x16).
 ; Direct bitmap copy, no saved background and no OR blending.
 ; -------------------------------------------------------------
 
@@ -369,8 +458,12 @@ DRAW_ENEMY_ROW:
 DRAW_ENEMY_SLOT:
     XOR A
     CALL DRAW_ENEMY_ROW
+    LD A,(IX+E_TYPE)
+    OR A
+    JR Z,.SINGLE_ROW
     LD A,1
     CALL DRAW_ENEMY_ROW
+.SINGLE_ROW:
     LD A,(IX+E_X)
     LD (IX+E_DRAW_X),A
     LD A,(IX+E_Y)
@@ -379,15 +472,15 @@ DRAW_ENEMY_SLOT:
     LD (IX+E_DRAWN),A
     RET
 
-; No writes to screen here: collect the old 1x2 / 2x2 rectangle.
+; No writes to screen: collect old 1x1 / 2x2 rectangle.
 ERASE_ENEMY_SLOT:
     LD B,(IX+E_DRAW_Y)
     LD C,(IX+E_DRAW_X)
-    LD DE,#0102                  ; D=width, E=height
+    LD DE,#0101                  ; small = width 1, height 1
     LD A,(IX+E_TYPE)
     OR A
     JR Z,.MARK
-    LD D,2
+    LD DE,#0202                  ; large = width 2, height 2
 .MARK:
     CALL STARFIELD_MARK_RECT
     XOR A
