@@ -1,14 +1,13 @@
 ; -------------------------------------------------------------
 ; INPUT: controls prepare positions only. No drawing here.
-; O/P: move; Q/A: speed on key-down edge; SPACE: fire on edge.
+; O/P: move; SPACE: fire on edge. Speed is score-driven.
 ; -------------------------------------------------------------
 READ_INPUT:
     CALL READ_SHIP_HORIZONTAL
-    CALL READ_SPEED_KEYS
     CALL READ_FIRE_KEY
     RET
 
-; The ship is now 8x8: one screen cell (X=6..25, Y=22).
+; The 8x8 ship stays within the can corridor (X=8..23, Y=22).
 ; Movement is still one cell per input tick; banking is independent:
 ; one pose every SHIP_BANK_DELAY frames, then a short hold after
 ; release to make brief turns visible.
@@ -17,39 +16,44 @@ READ_SHIP_HORIZONTAL:
     LD E,A
     LD BC,#DFFE
     IN A,(C)
-    BIT 0,A                    ; P: move right
+    BIT 0,A                    ; P: right
     JR NZ,.CHECK_LEFT
+    LD D,4
     LD A,E
-    CP 25
-    JR Z,.BANK_RIGHT
-    INC E
-.BANK_RIGHT:
-    LD D,4                     ; lean right
-    JR .MOVE
-
-.CHECK_LEFT:
-    BIT 1,A                    ; O: move left
-    JR NZ,.NO_KEY
-    LD A,E
-    CP 6
-    JR Z,.BANK_LEFT
-    DEC E
-.BANK_LEFT:
-    LD D,0                     ; lean left
-.MOVE:
-    LD A,(SHIP_NEW_POS)
-    CP E
+    CP PLAYFIELD_RIGHT
     JR Z,.SET_BANK
+    INC E
+    JR .MAYBE_MOVE
+.CHECK_LEFT:
+    BIT 1,A                    ; O: left
+    JR NZ,.NO_KEY
+    LD D,0
+    LD A,E
+    CP PLAYFIELD_LEFT
+    JR Z,.SET_BANK
+    DEC E
+
+.MAYBE_MOVE:
+    ; Banking responds immediately, but moving X is rate-limited.
+    LD A,(SHIP_MOVE_TIMER)
+    OR A
+    JR Z,.MOVE
+    DEC A
+    LD (SHIP_MOVE_TIMER),A
+    JR .SET_BANK
+.MOVE:
     LD A,E
     LD (SHIP_NEW_POS),A
+    LD A,SHIP_MOVE_DELAY-1
+    LD (SHIP_MOVE_TIMER),A
     LD A,1
     LD (SHIP_DIRTY),A
+
 .SET_BANK:
     LD A,D
     LD (SHIP_BANK_TARGET),A
     LD A,SHIP_BANK_HOLD
     LD (SHIP_BANK_HOLD_TIMER),A
-
 .NO_KEY:
     JP UPDATE_SHIP_BANK
 
@@ -92,51 +96,6 @@ UPDATE_SHIP_BANK:
     LD (SHIP_BANK),A
     LD A,1
     LD (SHIP_DIRTY),A
-    RET
-
-; Q/A change speed 1..3 for the HUD, asteroids and starfield.
-READ_SPEED_KEYS:
-    LD BC,#FBFE
-    IN A,(C)
-    BIT 0,A
-    JR NZ,.Q_RELEASED
-    LD A,(SPEED_UP_HELD)
-    OR A
-    JR NZ,.CHECK_A
-    LD A,1
-    LD (SPEED_UP_HELD),A
-    LD A,(SCROLL_SPEED)
-    CP 3
-    JR Z,.CHECK_A
-    INC A
-    LD (SCROLL_SPEED),A
-    LD A,1
-    LD (HUD_DIRTY),A
-    JR .CHECK_A
-.Q_RELEASED:
-    XOR A
-    LD (SPEED_UP_HELD),A
-.CHECK_A:
-    LD BC,#FDFE
-    IN A,(C)
-    BIT 0,A
-    JR NZ,.A_RELEASED
-    LD A,(SPEED_DOWN_HELD)
-    OR A
-    RET NZ
-    LD A,1
-    LD (SPEED_DOWN_HELD),A
-    LD A,(SCROLL_SPEED)
-    CP 1
-    RET Z
-    DEC A
-    LD (SCROLL_SPEED),A
-    LD A,1
-    LD (HUD_DIRTY),A
-    RET
-.A_RELEASED:
-    XOR A
-    LD (SPEED_DOWN_HELD),A
     RET
 
 ; No autofire: holding SPACE creates only one bullet.
@@ -241,3 +200,44 @@ SELECT_BLAST_FRAME:
     LD D,(HL)
     LD (BLAST_FRAME_PTR),DE
     RET
+
+; -------------------------------------------------------------
+; Score/bonus: 16-bit total, +64 small / +128 large on destruction.
+; IN A=points (64 or 128). Preserves IX.
+; At SCORE=1024 and 2048 increase speed, maximum 3.
+; Lives start at 4 and NEVER increase; impacts only decrease them.
+; -------------------------------------------------------------
+ADD_SCORE_A:
+    LD E,A
+    LD D,0
+    LD HL,(SCORE)
+    ADD HL,DE
+    JR NC,.STORE
+    LD HL,#FFFF                 ; do not wrap a long-running game
+.STORE:
+    LD (SCORE),HL
+    LD A,1
+    LD (HUD_DIRTY),A
+    JP CHECK_SCORE_BONUS
+
+CHECK_SCORE_BONUS:
+    LD HL,(SCORE)
+    LD A,H
+    SRL A
+    SRL A                       ; A = SCORE / 1024 (0..63)
+    LD HL,SCORE_TIER
+    CP (HL)
+    RET Z
+    RET C                       ; no rewards on score reduction
+    LD (HL),A
+
+    LD A,(SCROLL_SPEED)
+    CP MAX_SCROLL_SPEED
+    JR NC,.HUD
+    INC A
+    LD (SCROLL_SPEED),A
+.HUD:
+    LD A,1
+    LD (HUD_DIRTY),A
+    RET
+

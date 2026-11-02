@@ -1,4 +1,4 @@
-; ZX Space Demo - Step 05.3: compact 8x8 ship, slower banking.
+; SpaceCan Step 06: narrow can corridor, auto progression and tile artwork.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Coordinates are in 8x8 character cells: X in low byte, Y in high byte.
@@ -10,18 +10,26 @@
 BLAST_FRAME_DURATION EQU 4
 BLAST_FRAME_COUNT    EQU 4
 PLAYFIELD_TOP        EQU 4
+PLAYFIELD_LEFT       EQU 8
+PLAYFIELD_RIGHT      EQU 23
+PLAYFIELD_WIDTH      EQU 16
+PLAYFIELD_BOTTOM     EQU 23
+MAX_SCROLL_SPEED     EQU 3
+SCORE_BONUS_STEP     EQU 1024
+START_LIVES          EQU 4
+SHIP_MOVE_DELAY      EQU 2
 SHIP_BANK_DELAY      EQU 5    ; ticks between 8x8 banking poses
 SHIP_BANK_HOLD       EQU 14   ; keep tilt after releasing O/P
 MAX_BULLETS          EQU 6
 BULLET_SLOT_SIZE     EQU 8
-MAX_ENEMIES          EQU 4
+MAX_ENEMIES          EQU 3
 ENEMY_SLOT_SIZE      EQU 13
 ENEMY_FRAME_DELAY    EQU 4
 ENEMY_RESPAWN_DELAY  EQU 24
 
 ; One 13-byte enemy slot: state + animation + last drawn position.
 E_ACTIVE       EQU 0
-E_TYPE         EQU 1           ; 0=8x16, 1=16x16
+E_TYPE         EQU 1           ; 0=8x8, 1=16x16
 E_HP           EQU 2
 E_X            EQU 3
 E_Y            EQU 4
@@ -69,15 +77,18 @@ START:
     LD (BLAST_DRAWN),A
     LD (BLAST_FRAME),A
     LD (SCORE),A
+    LD (SCORE+1),A
+    LD (SCORE_TIER),A
     LD (BULLET_COUNT),A
     LD (SPACE_HELD),A
-    LD (SPEED_UP_HELD),A
-    LD (SPEED_DOWN_HELD),A
+    LD (SHIP_MOVE_TIMER),A
     LD (BLAST_DIRTY),A
 
     LD A,1
-    LD (SCROLL_SPEED),A         ; stars and asteroid speed
+    LD (SCROLL_SPEED),A         ; automatically increases with score
     LD (HUD_DIRTY),A
+    LD A,START_LIVES
+    LD (SHIP_LIVES),A
     LD (SHIP_DIRTY),A
 
     LD HL,(SHIP_START_POS)

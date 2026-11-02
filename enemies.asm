@@ -1,5 +1,5 @@
 ; -------------------------------------------------------------
-; ENEMIES: four asteroids falling vertically (8x8 and 16x16).
+; ENEMIES: three asteroids falling vertically (8x8 and 16x16).
 ;
 ; IX -> current enemy slot. X is assigned at every spawn and
 ; remains constant until deactivation; overlapping spawn positions
@@ -61,7 +61,7 @@ INIT_ENEMIES:
     LD (ENEMY_MOVE_TIMER),A
     RET
 
-; Q/A speed 1..3 controls vertical move period: 4..2 game ticks.
+; Automatic speed 1..3 controls vertical move period: 4..2 ticks.
 UPDATE_ENEMIES:
     LD A,(ENEMY_MOVE_TIMER)
     DEC A
@@ -175,9 +175,8 @@ SELECT_ENEMY_SPAWN_X:
     PUSH DE
     PUSH HL
 
-    ; Number of possible LEFT coordinates:
-    ; small 8x8: X=6..25 (20); large 16x16: X=6..24 (19).
-    LD C,20
+    ; Small uses all 16 columns; large has 15 valid left-Xs.
+    LD C,PLAYFIELD_WIDTH
     LD A,(IX+E_TYPE)
     OR A
     JR Z,.PICK
@@ -190,23 +189,23 @@ SELECT_ENEMY_SPAWN_X:
     SUB C
     JR .MODULO
 .START_X:
-    ADD A,6
+    ADD A,PLAYFIELD_LEFT
     LD (IX+E_X),A
-    LD B,20                     ; at most 20 candidate positions
+    LD B,PLAYFIELD_WIDTH       ; at most 16 candidate positions
 .TRY:
     CALL ENEMY_SPAWN_CLEAR
     JR NC,.SUCCESS
 
-    LD C,25
+    LD C,PLAYFIELD_RIGHT
     LD A,(IX+E_TYPE)
     OR A
     JR Z,.STEP
-    DEC C                       ; large rightmost left-X is 24
+    DEC C                       ; large rightmost left-X is 22
 .STEP:
     LD A,(IX+E_X)
     CP C
     JR C,.INCREMENT
-    LD A,6
+    LD A,PLAYFIELD_LEFT
     JR .SAVE_X
 .INCREMENT:
     INC A
@@ -326,24 +325,24 @@ DEACTIVATE_ENEMY:
     LD (IX+E_DIRTY),A
     RET
 
-; IX -> enemy: one hit = one HP and +5 score (max 95).
+; IX -> enemy: score is awarded only on destruction.
+; Small = 64 points, large = 128 points; difficulty checks happen
+; after the score changes so every 1024-point threshold is caught.
 ON_ENEMY_HIT:
     DEC (IX+E_HP)
-    JR NZ,.STILL_ALIVE
+    JR NZ,.DAMAGED
     CALL START_ENEMY_BLAST
     CALL DEACTIVATE_ENEMY
-    JR .SCORE
-.STILL_ALIVE:
+    LD A,(IX+E_TYPE)
+    OR A
+    LD A,64
+    JR Z,.AWARD
+    LD A,128
+.AWARD:
+    JP ADD_SCORE_A
+.DAMAGED:
     LD A,1
     LD (IX+E_DIRTY),A
-.SCORE:
-    LD A,(SCORE)
-    CP 95
-    RET NC
-    ADD A,5
-    LD (SCORE),A
-    LD A,1
-    LD (HUD_DIRTY),A
     RET
 
 ; Compare enemies at player row to logical ship X/X+1.
@@ -390,11 +389,11 @@ CHECK_SHIP_ENEMY_SLOT:
     RET Z                       ; small asteroid is only 1 cell wide
 .HIT:
     CALL DEACTIVATE_ENEMY
-    LD A,(SHIP_HP)
+    LD A,(SHIP_LIVES)
     OR A
     RET Z
-    SUB 25
-    LD (SHIP_HP),A
+    DEC A
+    LD (SHIP_LIVES),A
     LD A,1
     LD (HUD_DIRTY),A
     RET

@@ -81,17 +81,18 @@ SHIP_BANK_HOLD_TIMER:
 SHIP_DRAWN:
     DB 0
 
-SHIP_HP:
-    DB 100                      ; 100 -> 75 -> 50 -> 25 -> 0
+SHIP_LIVES:
+    DB START_LIVES              ; 4 initially; collisions only decrease
+SHIP_MOVE_TIMER:
+    DB 0                        ; frames until next horizontal step
 
 ; Four independent falling objects. On EVERY spawn, X is
 ; freshly selected in the full corridor using an 8-bit LFSR.
 ; The initial table stores only TYPE, START_Y, ANIMATION_PHASE.
 ENEMY_START_TABLE:
-    DB 0,4,1                    ; small 8x8, starts in top row
+    DB 0,4,1                    ; small 8x8
     DB 1,11,2                   ; large 16x16
-    DB 0,5,3                    ; small 8x8
-    DB 1,16,4                   ; large 16x16
+    DB 0,17,3                   ; small 8x8
 
 ENEMY_MOVE_TIMER:
     DB 4
@@ -366,37 +367,39 @@ DIRTY_QUEUE:   DS 320,0          ; 160 unique character cells
 
 STAR_POOL:
     ; Mid layer: SCROLL_SPEED pixels every two frames.
-    DB 6,73,#10,1
-    DB 9,150,#01,1
-    DB 13,43,#02,1
-    DB 16,170,#08,1
-    DB 19,84,#20,1
-    DB 23,37,#04,1
-    DB 8,114,#40,1
-    DB 24,141,#02,1
-
+    DB 8,73,#10,1
+    DB 10,150,#01,1
+    DB 12,43,#02,1
+    DB 14,170,#08,1
+    DB 16,84,#20,1
+    DB 18,37,#04,1
+    DB 20,114,#40,1
+    DB 22,141,#02,1
     ; Far layer: SCROLL_SPEED pixels every four frames.
-    DB 7,178,#80,3
+    DB 9,178,#80,3
     DB 11,38,#08,3
-    DB 15,128,#10,3
-    DB 17,66,#01,3
-    DB 21,152,#20,3
-    DB 25,98,#04,3
-    DB 10,52,#40,3
-    DB 19,186,#02,3
-
+    DB 13,128,#10,3
+    DB 15,66,#01,3
+    DB 17,152,#20,3
+    DB 19,98,#04,3
+    DB 21,52,#40,3
+    DB 23,186,#02,3
 ; -------------------------------------------------------------
 ; Input and HUD state.
 ; -------------------------------------------------------------
-SCROLL_SPEED:      DB 1        ; 1..3, multiplier for stars and asteroid speed
-SCORE:             DB 0        ; demo score 0..99
-HUD_DIRTY:         DB 1        ; dynamic numeric labels need redraw
-SPACE_HELD:        DB 0        ; key edge detection
-SPEED_UP_HELD:     DB 0
-SPEED_DOWN_HELD:   DB 0
+SCROLL_SPEED:      DB 1        ; auto 1..3, multiplier for star/asteroid speed
+SCORE:             DW 0        ; 0..65535, saturating 16-bit total
+SCORE_TIER:        DB 0        ; SCORE / 1024 at last bonus
+HUD_DIRTY:         DB 1        ; numeric labels need redraw
+SPACE_HELD:        DB 0
 
-HUD_LABEL_SPEED: DB "SPEED",0
-HUD_LABEL_SCORE: DB "SCORE",0
-HUD_LABEL_LIVES: DB "LIVES",0
+HUD_LABEL_TITLE:  DB "SPACE SODA",0
+HUD_LABEL_SPEED:  DB "SPEED",0
+HUD_LABEL_SCORE:  DB "SCORE",0
+HUD_LABEL_LIVES:  DB "LIVES",0
+
+CAN_LABEL_LEFT:   DB "SPA",0
+CAN_LABEL_RIGHT:  DB "CAN",0
+CAN_LABEL_VOLUME: DB "0.33",0
 
 PROGRAM_END:

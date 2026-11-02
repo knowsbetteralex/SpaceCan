@@ -1,34 +1,51 @@
 ; -------------------------------------------------------------
-; 4-row cockpit HUD and 20-row static side-hull tile pictures.
-; Dynamic values update only when HUD_DIRTY is set.
-; Existing SHIP_HP 100/75/50/25/0 -> 4/3/2/1/0 life tiles.
+; SpaceCan Step 06: "Space Soda 0.33 L" static can/wall/bar mural.
+; Top 4 rows: HUD (32x4). Sides: wall + can, 8x20 each.
+; Only digital SPEED / SCORE / LIVES change at runtime.
 ; -------------------------------------------------------------
 DRAW_STATIC_UI:
     LD HL,HUD_TILE_MAP
     LD BC,#0000
-    LD DE,#2004                 ; 32 x 4 HUD
+    LD DE,#2004                  ; 32x4
     CALL DRAW_TILE_MAP
 
-    LD HL,SIDE_LEFT_TILE_MAP
-    LD BC,#0400                 ; left side: X=0, Y=4
-    LD DE,#0614                 ; 6 x 20
+    LD HL,CAN_LEFT_TILE_MAP
+    LD BC,#0400                  ; Y=4, X=0
+    LD DE,#0814                  ; 8x20
     CALL DRAW_TILE_MAP
 
-    LD HL,SIDE_RIGHT_TILE_MAP
-    LD BC,#041A                 ; right side: X=26, Y=4
-    LD DE,#0614
+    LD HL,CAN_RIGHT_TILE_MAP
+    LD BC,#0418                  ; Y=4, X=24
+    LD DE,#0814                  ; 8x20
     CALL DRAW_TILE_MAP
+
+    ; ROM font characters are also 8x8 tiles.
+    LD BC,#000B                  ; top chrome rail
+    LD DE,HUD_LABEL_TITLE
+    CALL PRINT_TEXT
 
     LD BC,#0102
     LD DE,HUD_LABEL_SPEED
     CALL PRINT_TEXT
-    LD BC,#010D
+    LD BC,#010C
     LD DE,HUD_LABEL_SCORE
     CALL PRINT_TEXT
-    LD BC,#0118
+    LD BC,#0119
     LD DE,HUD_LABEL_LIVES
+    CALL PRINT_TEXT
+
+    ; Label fragments on either side of the black playfield.
+    LD BC,#0904                  ; left can X=4..6
+    LD DE,CAN_LABEL_LEFT
+    CALL PRINT_TEXT
+    LD BC,#0919                  ; right can X=25..27
+    LD DE,CAN_LABEL_RIGHT
+    CALL PRINT_TEXT
+    LD BC,#0619                  ; 0.33 as a small can mark
+    LD DE,CAN_LABEL_VOLUME
     JP PRINT_TEXT
 
+; Draw no more than 7 characters when a reading changes.
 RENDER_HUD:
     LD A,(HUD_DIRTY)
     OR A
@@ -38,59 +55,57 @@ RENDER_HUD:
 
     LD A,(SCROLL_SPEED)
     ADD A,'0'
-    LD BC,#0207                 ; speed (row 2, X=7)
+    LD BC,#0205                  ; SPEED
     CALL DRAW_CHAR_AT
 
-    LD A,(SCORE)
-    LD BC,#0210                 ; score (row 2, X=16-17)
-    CALL PRINT_DEC2
+    LD HL,(SCORE)
+    LD BC,#020C                  ; 5 digits: 00000..65535
+    CALL PRINT_DEC5
 
-    ; Four shield tiles (X=25..28). Thresholds 25,50,75,100.
-    LD BC,#0219
-    LD D,25
-    LD E,4
-.LIVES:
-    PUSH BC
-    PUSH DE
-    LD A,(SHIP_HP)
-    CP D
-    LD A,T_LIFE_OFF
-    JR C,.DRAW_LIFE
-    LD A,T_LIFE_ON
-.DRAW_LIFE:
-    CALL DRAW_TILE_ID
-    POP DE
-    POP BC
-    INC C
-    LD A,D
-    ADD A,25
-    LD D,A
-    DEC E
-    JR NZ,.LIVES
-    RET
-
-; IN: A=0..99, BC=first digit coordinate (Y in B, X in C).
-PRINT_DEC2:
-    LD D,0
-.TENS:
-    CP 10
-    JR C,.WRITE
-    SUB 10
-    INC D
-    JR .TENS
-.WRITE:
-    PUSH AF
-    LD A,D
+    LD A,(SHIP_LIVES)
     ADD A,'0'
-    PUSH BC
-    CALL DRAW_CHAR_AT
-    POP BC
-    INC C
-    POP AF
+    LD BC,#021B                  ; lives 0..9
+    JP DRAW_CHAR_AT
+
+; IN HL=0..65535, BC=YX of leftmost digit.
+; Four repeated divisions by 10^n, ending with the units.
+; Dynamic HUD only: straightforward code is preferred to speed.
+PRINT_DEC5:
+    LD DE,10000
+    CALL PRINT_DEC_PLACE
+    LD DE,1000
+    CALL PRINT_DEC_PLACE
+    LD DE,100
+    CALL PRINT_DEC_PLACE
+    LD DE,10
+    CALL PRINT_DEC_PLACE
+    LD A,L
     ADD A,'0'
     JP DRAW_CHAR_AT
 
-; ROM font glyphs are also 8x8 bitmap tiles, starting at #3D00.
+; IN HL=remainder, DE=decimal place, BC=YX.
+; OUT HL=remainder after quotient, C advanced one screen column.
+PRINT_DEC_PLACE:
+    LD A,'0'
+.NEXT:
+    OR A                         ; clear carry before SBC HL,DE
+    SBC HL,DE
+    JR C,.WRITE
+    INC A
+    JR .NEXT
+.WRITE:
+    ADD HL,DE                    ; undo the final underflow
+    PUSH HL
+    PUSH DE
+    PUSH BC
+    CALL DRAW_CHAR_AT
+    POP BC
+    POP DE
+    POP HL
+    INC C
+    RET
+
+; IN BC=YX, DE=zero-terminated text.
 PRINT_TEXT:
 .NEXT:
     LD A,(DE)
@@ -105,7 +120,7 @@ PRINT_TEXT:
     INC C
     JR .NEXT
 
-; IN: A=ASCII 32..127, BC=screen YX.
+; IN A=ASCII 32..127, BC=YX; draw 8 rows using Spectrum ROM font.
 DRAW_CHAR_AT:
     SUB 32
     LD L,A
