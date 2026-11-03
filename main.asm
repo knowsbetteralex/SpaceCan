@@ -1,4 +1,4 @@
-; SpaceCan Step 07: native ZX bitmap artwork + game overlay.
+; SpaceCan Step 08: title menu, ship blast, respawn and game over.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Coordinates are in 8x8 character cells: X in low byte, Y in high byte.
@@ -26,6 +26,13 @@ MAX_ENEMIES          EQU 3
 ENEMY_SLOT_SIZE      EQU 13
 ENEMY_FRAME_DELAY    EQU 4
 ENEMY_RESPAWN_DELAY  EQU 24
+SHIP_BLAST_DURATION  EQU 5    ; 6 frames x 5 ticks = 0.6 sec
+SHIP_BLAST_FRAMES    EQU 6
+STATE_MENU           EQU 0
+STATE_PLAYING        EQU 1
+STATE_EXPLODING      EQU 2
+STATE_RESPAWN        EQU 3
+STATE_GAME_OVER      EQU 4
 
 ; One 13-byte enemy slot: state + animation + last drawn position.
 E_ACTIVE       EQU 0
@@ -56,69 +63,62 @@ B_RESERVED  EQU 7       ; padding; no saved background
 
 START:
     DI
-    CALL DRAW_STATIC_UI          ; decompress can/bar screen then labels
-    LD A,1
-    OUT (#FE),A                  ; blue border
+    IM 1                         ; 48K ROM interrupt handler
+    EI
+    JP SHOW_START_MENU
 
-    ; Initialise bullet slots (state only, no saved background).
-    LD HL,BULLET_POOL
-    LD (HL),0
-    LD DE,BULLET_POOL+1
-    LD BC,MAX_BULLETS*BULLET_SLOT_SIZE-1
-    LDIR
-
-    CALL INIT_ENEMIES
-    CALL STARFIELD_INIT
-
+; New game (from menu or after Game Over):
+; only here are score, speed and lives reset.
+START_NEW_GAME:
     XOR A
-    LD (SHIP_DRAWN),A
-    LD (BLAST_ACTIVE),A
-    LD (BLAST_DRAWN),A
-    LD (BLAST_FRAME),A
     LD (SCORE),A
     LD (SCORE+1),A
     LD (SCORE_TIER),A
-    LD (BULLET_COUNT),A
-    LD (SPACE_HELD),A
-    LD (SHIP_MOVE_TIMER),A
-    LD (BLAST_DIRTY),A
-
     LD A,1
-    LD (SCROLL_SPEED),A         ; automatically increases with score
-    LD (HUD_DIRTY),A
+    LD (SCROLL_SPEED),A
     LD A,START_LIVES
     LD (SHIP_LIVES),A
-    LD (SHIP_DIRTY),A
+    JP RESTART_ROUND
 
-    LD HL,(SHIP_START_POS)
-    LD (SHIP_CUR_POS),HL
-    LD (SHIP_NEW_POS),HL
-    LD A,2
-    LD (SHIP_BANK),A
-    LD (SHIP_BANK_TARGET),A
-    XOR A
-    LD (SHIP_BANK_TIMER),A
-    LD (SHIP_BANK_HOLD_TIMER),A
-    LD (BLAST_TYPE),A
-    LD HL,BLAST_FRAME_0
-    LD (BLAST_FRAME_PTR),HL
-
-    IM 1                         ; 48K ROM interrupt handler
+; Continue after ship explosion, preserving score/speed/lives.
+RESTART_ROUND:
+    DI
+    CALL DRAW_STATIC_UI
+    CALL RESET_ROUND_OBJECTS
+    LD A,STATE_PLAYING
+    LD (GAME_STATE),A
     EI
+    JP MAIN_LOOP
 
 MAIN_LOOP:
     HALT
+    LD A,(GAME_STATE)
+    CP STATE_RESPAWN
+    JP Z,RESTART_ROUND
+    CP STATE_GAME_OVER
+    JP Z,SHOW_GAME_OVER
+
     DEBUG_PHASE DBG_RENDER_COLOUR
-    CALL RENDER_FRAME            ; all graphics first
+    CALL RENDER_FRAME
     DEBUG_PHASE DBG_HUD_COLOUR
-    CALL RENDER_HUD              ; only when UI fields changed
+    CALL RENDER_HUD
     DEBUG_PHASE DBG_INPUT_COLOUR
-    CALL READ_INPUT              ; capture next game state
+    LD A,(GAME_STATE)
+    CP STATE_PLAYING
+    JR NZ,.EXPLODING
+    CALL READ_INPUT
     DEBUG_PHASE DBG_LOGIC_COLOUR
-    CALL UPDATE_GAME             ; movement, hits, animations
-    DEBUG_PHASE DBG_IDLE_COLOUR ; visible idle border during HALT
+    CALL UPDATE_GAME
+    JR .FRAME_END
+.EXPLODING:
+    ; The only moving item during this mode is the ship explosion.
+    DEBUG_PHASE DBG_LOGIC_COLOUR
+    CALL UPDATE_BLAST_ANIM
+.FRAME_END:
+    DEBUG_PHASE DBG_IDLE_COLOUR
     JR MAIN_LOOP
 
+    INCLUDE "menu.asm"
     INCLUDE "logic.asm"
     INCLUDE "bullets.asm"
     INCLUDE "enemies.asm"

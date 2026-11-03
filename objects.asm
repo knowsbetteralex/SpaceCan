@@ -38,7 +38,20 @@ DRAW_BLAST:
     LD A,(BLAST_TYPE)
     OR A
     JR NZ,.WIDE
+    ; Different colours for dedicated six-frame ship blast.
+    PUSH HL
+    LD A,(BLAST_OWNER)
+    OR A
     LD DE,BLAST_ATTR_SMALL
+    JR Z,.SMALL_ATTR
+    LD A,(BLAST_FRAME)
+    LD E,A
+    LD D,0
+    LD HL,SHIP_BLAST_ATTRS
+    ADD HL,DE
+    EX DE,HL
+.SMALL_ATTR:
+    POP HL
     CALL RESTORE_ATTR_1_1
     LD DE,(BLAST_FRAME_PTR)
     JP DRAW_1_1

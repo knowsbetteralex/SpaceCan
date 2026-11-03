@@ -361,6 +361,9 @@ CHECK_SHIP_ENEMY_COLLISIONS:
 ; Ship occupies one X column and one row.
 ; Small asteroid: 1x1; large: 2x2.
 CHECK_SHIP_ENEMY_SLOT:
+    LD A,(GAME_STATE)
+    CP STATE_PLAYING
+    RET NZ                    ; second collision cannot cost another life
     LD A,(IX+E_ACTIVE)
     OR A
     RET Z
@@ -396,7 +399,7 @@ CHECK_SHIP_ENEMY_SLOT:
     LD (SHIP_LIVES),A
     LD A,1
     LD (HUD_DIRTY),A
-    RET
+    JP START_SHIP_EXPLOSION
 
 ; IN: IX=bullet; OUT: carry set iff bullet consumed.
 ; Preserves IX for caller and all bullet-specific procedures.

@@ -123,6 +123,9 @@ UPDATE_GAME:
     CALL UPDATE_ENEMIES
     CALL UPDATE_BULLETS
     CALL CHECK_SHIP_ENEMY_COLLISIONS
+    LD A,(GAME_STATE)
+    CP STATE_PLAYING
+    RET NZ                     ; ship destroyed: freeze starfield
     CALL STARFIELD_UPDATE
     RET
 
@@ -141,6 +144,7 @@ START_ENEMY_BLAST:
     LD A,(IX+E_TYPE)
     LD (BLAST_TYPE),A           ; 0=8x8, 1=16x8 explosion
     XOR A
+    LD (BLAST_OWNER),A         ; 0=asteroid; 1=ship
     LD (BLAST_FRAME),A
     CALL SELECT_BLAST_FRAME
     LD A,BLAST_FRAME_DURATION
@@ -154,7 +158,36 @@ START_ENEMY_BLAST:
     ENDIF
     RET
 
-; One-shot explosion: four phases, four ticks per phase.
+; Dedicated ship explosion replaces any asteroid blast. Its last
+; drawn image is marked for erasure BEFORE BLAST_POS is replaced.
+; The renderer then erases the ship and paints explosion frame zero.
+START_SHIP_EXPLOSION:
+    LD A,(BLAST_DRAWN)
+    OR A
+    JR Z,.OLD_GONE
+    CALL ERASE_BLAST
+    XOR A
+    LD (BLAST_DRAWN),A
+.OLD_GONE:
+    LD HL,(SHIP_NEW_POS)
+    LD (BLAST_POS),HL
+    LD A,1
+    LD (BLAST_OWNER),A
+    LD (BLAST_ACTIVE),A
+    LD (BLAST_DIRTY),A
+    LD (SHIP_DIRTY),A
+    LD A,STATE_EXPLODING
+    LD (GAME_STATE),A
+    XOR A
+    LD (SHIP_VISIBLE),A
+    LD (BLAST_TYPE),A         ; dedicated blast is 8x8
+    LD (BLAST_FRAME),A
+    CALL SELECT_BLAST_FRAME
+    LD A,SHIP_BLAST_DURATION
+    LD (BLAST_ANIM_TIMER),A
+    RET
+
+; Enemy blast: 4x4 ticks. Ship blast: 6x5 ticks (0.6 seconds).
 UPDATE_BLAST_ANIM:
     LD A,(BLAST_ACTIVE)
     OR A
@@ -162,10 +195,24 @@ UPDATE_BLAST_ANIM:
     LD HL,BLAST_ANIM_TIMER
     DEC (HL)
     RET NZ
-    LD (HL),BLAST_FRAME_DURATION
+    LD A,(BLAST_OWNER)
+    OR A
+    LD A,BLAST_FRAME_DURATION
+    JR Z,.STORE_DURATION
+    LD A,SHIP_BLAST_DURATION
+.STORE_DURATION:
+    LD (HL),A
     LD A,(BLAST_FRAME)
     INC A
-    CP BLAST_FRAME_COUNT
+    LD C,BLAST_FRAME_COUNT
+    LD B,A
+    LD A,(BLAST_OWNER)
+    OR A
+    JR Z,.FRAME_LIMIT
+    LD C,SHIP_BLAST_FRAMES
+.FRAME_LIMIT:
+    LD A,B
+    CP C
     JR Z,.FINISH
     LD (BLAST_FRAME),A
     CALL SELECT_BLAST_FRAME
@@ -177,23 +224,36 @@ UPDATE_BLAST_ANIM:
     LD (BLAST_ACTIVE),A
     LD A,1
     LD (BLAST_DIRTY),A
-    IFN DEBUG_BORDER
-        OUT (#FE),A             ; blue border restored in release mode
-    ENDIF
+    LD A,(BLAST_OWNER)
+    OR A
+    RET Z                     ; an asteroid blast ends normally
+    LD A,(SHIP_LIVES)
+    OR A
+    LD A,STATE_RESPAWN
+    JR NZ,.NEXT_MODE
+    LD A,STATE_GAME_OVER
+.NEXT_MODE:
+    LD (GAME_STATE),A
     RET
 
-; IN: BLAST_FRAME=0..3. OUT: BLAST_FRAME_PTR updated.
+; IN: BLAST_FRAME=frame index. OUT BLAST_FRAME_PTR.
 SELECT_BLAST_FRAME:
     LD A,(BLAST_FRAME)
     ADD A,A
     LD E,A
     LD D,0
+    LD A,(BLAST_OWNER)
+    OR A
+    JR Z,.ASTEROID
+    LD HL,SHIP_BLAST_FRAME_PTRS
+    JR .SELECT
+.ASTEROID:
     LD A,(BLAST_TYPE)
     OR A
     LD HL,BLAST_SMALL_FRAMES
-    JR Z,.HAVE_TABLE
+    JR Z,.SELECT
     LD HL,BLAST_FRAMES
-.HAVE_TABLE:
+.SELECT:
     ADD HL,DE
     LD E,(HL)
     INC HL

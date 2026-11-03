@@ -80,6 +80,11 @@ SHIP_BANK_HOLD_TIMER:
     DB 0                         ; pause before leveling after key release
 SHIP_DRAWN:
     DB 0
+SHIP_VISIBLE:
+    DB 1                       ; 0 during ship explosion
+
+GAME_STATE:
+    DB STATE_MENU               ; menu / playing / exploding / respawn / over
 
 SHIP_LIVES:
     DB START_LIVES              ; 4 initially; collisions only decrease
@@ -256,6 +261,8 @@ BLAST_ACTIVE:
     DB 0
 BLAST_DRAWN:
     DB 0
+BLAST_OWNER:
+    DB 0                       ; 0 asteroid, 1 ship
 BLAST_TYPE:
     DB 0                        ; 0=8x8 for small, 1=16x8 for large
 BLAST_FRAME:
@@ -349,6 +356,69 @@ BLAST_FRAME_3:
     DB $00,$00
     DB $20,$01
     DB $00,$00
+
+; Six expressive ship-debris frames, each 8x8.
+; Yellow ignition, red fireball, white shrapnel.
+SHIP_BLAST_ATTRS:
+    DB #46,#46,#42,#42,#47,#47
+SHIP_BLAST_FRAME_PTRS:
+    DW SHIP_BLAST_0,SHIP_BLAST_1,SHIP_BLAST_2
+    DW SHIP_BLAST_3,SHIP_BLAST_4,SHIP_BLAST_5
+
+SHIP_BLAST_0:
+    DB %00011000
+    DB %00111100
+    DB %01111110
+    DB %11011011
+    DB %11111111
+    DB %01111110
+    DB %00100100
+    DB %01000010
+SHIP_BLAST_1:
+    DB %10011001
+    DB %01111110
+    DB %11111111
+    DB %11111111
+    DB %11111111
+    DB %11111111
+    DB %01111110
+    DB %10011001
+SHIP_BLAST_2:
+    DB %10100101
+    DB %01111110
+    DB %11111111
+    DB %11100111
+    DB %11100111
+    DB %11111111
+    DB %01111110
+    DB %10100101
+SHIP_BLAST_3:
+    DB %10011001
+    DB %01000010
+    DB %00111100
+    DB %10100101
+    DB %10100101
+    DB %00111100
+    DB %01000010
+    DB %10011001
+SHIP_BLAST_4:
+    DB %10000001
+    DB %00100100
+    DB %01000010
+    DB %00011000
+    DB %00011000
+    DB %01000010
+    DB %00100100
+    DB %10000001
+SHIP_BLAST_5:
+    DB %00000000
+    DB %01000010
+    DB %00000000
+    DB %00100100
+    DB %00000000
+    DB %01000010
+    DB %00000000
+    DB %00000000
 
 ; Dirty flags for explosion and player.
 ; Bullet dirty state is inside each bullet slot.
