@@ -1,5 +1,5 @@
-; === main.asm ===
-; SpaceCan Step 08: title menu, ship blast, respawn and game over.
+; ===== main.asm =====
+; SpaceCan Step 09.1: pixel-accurate bullet / explosion at half-cell X.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -22,7 +22,7 @@ SHIP_MOVE_DELAY      EQU 2
 SHIP_BANK_DELAY      EQU 5    ; ticks between 8x8 banking poses
 SHIP_BANK_HOLD       EQU 14   ; keep tilt after releasing O/P
 MAX_BULLETS          EQU 6
-BULLET_SLOT_SIZE     EQU 8
+BULLET_SLOT_SIZE     EQU 9
 MAX_ENEMIES          EQU 3
 ENEMY_SLOT_SIZE      EQU 13
 ENEMY_FRAME_DELAY    EQU 8     ; rotate once every 8 ticks
@@ -74,7 +74,7 @@ MACRO DEBUG_PHASE colour
 ENDM
 
 
-; Each bullet slot is exactly 8 bytes (offsets from IX).
+; Each bullet slot is 9 bytes; current/drawn half-cell offsets differ.
 B_ACTIVE    EQU 0  ; 0=free, 1=just spawned, 2=flying
 B_X         EQU 1
 B_Y         EQU 2
@@ -82,7 +82,8 @@ B_DRAWN     EQU 3
 B_DRAW_X    EQU 4
 B_DRAW_Y    EQU 5
 B_DIRTY     EQU 6
-B_RESERVED  EQU 7       ; padding; no saved background
+B_HALF      EQU 7  ; spawn 4px offset (0=aligned,1=half cell)
+B_DRAW_HALF EQU 8  ; 4px offset of last drawn picture
 
 START:
     DI
@@ -141,7 +142,7 @@ MAIN_LOOP:
     DEBUG_PHASE DBG_IDLE_COLOUR
     JR MAIN_LOOP
 
-; === menu.asm ===
+; ===== menu.asm =====
 ; -------------------------------------------------------------
 ; Step 08: main menu / Game Over / full-round reset.
 ; Background: Space Soda .SCR, already quantized for ZX 48K.
@@ -236,6 +237,7 @@ RESET_ROUND_OBJECTS:
     LD (BLAST_FRAME),A
     LD (BLAST_DIRTY),A
     LD (BLAST_OWNER),A
+    LD (BLAST_HALF),A
     LD (BLAST_TYPE),A
     LD (BULLET_COUNT),A
     LD (SHIP_MOVE_TIMER),A
@@ -538,7 +540,7 @@ MENU_GLYPH_N:
     DB #18,#18
     DB #00,#00
 
-; === logic.asm ===
+; ===== logic.asm =====
 ; -------------------------------------------------------------
 ; INPUT: controls prepare positions only. No drawing here.
 ; O/P: move; SPACE: fire on edge. Speed is score-driven.
@@ -716,6 +718,7 @@ START_ENEMY_BLAST:
     LD (BLAST_TYPE),A           ; 0=8x8, 1=16x8 explosion
     XOR A
     LD (BLAST_OWNER),A         ; 0=asteroid; 1=ship
+    LD (BLAST_HALF),A          ; asteroids always cell aligned
     LD (BLAST_FRAME),A
     CALL SELECT_BLAST_FRAME
     LD A,BLAST_FRAME_DURATION
@@ -741,12 +744,9 @@ START_SHIP_EXPLOSION:
     LD (BLAST_DRAWN),A
 .OLD_GONE:
     LD HL,(SHIP_NEW_POS)
+    LD (BLAST_POS),HL           ; retain base X, don't round to next cell
     LD A,(SHIP_HALF_POS)
-    OR A
-    JR Z,.CENTERED
-    INC L                        ; 8x8 blast at the ship nose
-.CENTERED:
-    LD (BLAST_POS),HL
+    LD (BLAST_HALF),A          ; ship blast is also shifted by exactly 4px
     LD A,1
     LD (BLAST_OWNER),A
     LD (BLAST_ACTIVE),A
@@ -877,9 +877,9 @@ CHECK_SCORE_BONUS:
     LD (HUD_DIRTY),A
     RET
 
-; === bullets.asm ===
+; ===== bullets.asm =====
 ; -------------------------------------------------------------
-; BULLET POOL (6 x 8 bytes)
+; BULLET POOL (6 x 9 bytes)
 ;
 ; A slot is reusable only when ACTIVE=0 and DRAWN=0.
 ; ACTIVE=0 free, 1 just spawned, 2 in flight.
@@ -892,7 +892,7 @@ CHECK_SCORE_BONUS:
 ; -------------------------------------------------------------
 
 ; Find a free slot and spawn a bullet directly above the ship.
-; Bullet follows the nose cell (X or X+1 when ship is half-shifted).
+; Bullet preserves the ship's exact 4px alignment at firing.
 ; DESTROYS AF, BC, DE, HL, IX.
 FIRE_BULLET:
     LD A,(BULLET_COUNT)
@@ -909,14 +909,11 @@ FIRE_BULLET:
     JR NZ,.NEXT_SLOT
 
     LD HL,(SHIP_NEW_POS)
-    LD A,(SHIP_HALF_POS)
-    OR A
-    JR Z,.NOSE_CELL
-    INC L                        ; nose crosses into the next 8px cell
-.NOSE_CELL:
     DEC H                        ; launch one row above the ship
     LD (IX+B_X),L
     LD (IX+B_Y),H
+    LD A,(SHIP_HALF_POS)
+    LD (IX+B_HALF),A            ; 0=aligned, 1=shift right 4 pixels
     LD A,1
     LD (IX+B_ACTIVE),A
     LD (IX+B_DIRTY),A
@@ -992,15 +989,39 @@ CHECK_BULLET_COLLISION:
     LD A,(BLAST_POS+1)
     CP (IX+B_Y)
     RET NZ
+
+    ; Check character-cell overlap of bullet and explosion.
+    ; A shifted 8x8 bullet can occupy B_X and B_X+1.
+    ; A large asteroid blast or shifted ship blast covers 2 cells.
     LD A,(BLAST_POS)
-    CP (IX+B_X)
+    LD C,A
+    LD A,(IX+B_X)
+    CP C
     JR Z,.ABSORB
+    JR C,.BULLET_LEFT
+
+    ; Bullet lies one cell to the right of the blast start.
+    SUB C
+    CP 1
+    RET NZ
     LD A,(BLAST_TYPE)
     OR A
-    RET Z                       ; small explosion occupies only X
-    LD A,(BLAST_POS)
+    JR NZ,.ABSORB
+    LD A,(BLAST_OWNER)
+    OR A
+    RET Z
+    LD A,(BLAST_HALF)
+    OR A
+    RET Z
+    JR .ABSORB
+
+.BULLET_LEFT:
+    LD A,(IX+B_HALF)
+    OR A
+    RET Z
+    LD A,(IX+B_X)
     INC A
-    CP (IX+B_X)
+    CP C
     RET NZ
 .ABSORB:
     JP DEACTIVATE_BULLET
@@ -1031,6 +1052,21 @@ RENDER_ERASE_BULLETS:
     LD A,(IX+B_DRAWN)
     OR A
     CALL NZ,ERASE_BULLET_SLOT
+
+    ; Also invalidate the new occupied area, so stars behind a
+    ; newly fired half-shifted bullet are restored on the star pass.
+    LD A,(IX+B_ACTIVE)
+    OR A
+    JR Z,.SKIP
+    LD B,(IX+B_Y)
+    LD C,(IX+B_X)
+    LD DE,#0101
+    LD A,(IX+B_HALF)
+    OR A
+    JR Z,.MARK_NEW
+    LD D,2
+.MARK_NEW:
+    CALL STARFIELD_MARK_RECT
 .SKIP:
     POP BC
     LD DE,BULLET_SLOT_SIZE
@@ -1063,15 +1099,26 @@ DRAW_BULLET_SLOT:
     LD B,(IX+B_Y)
     LD C,(IX+B_X)
     CALL GET_SCREEN_ADDR
+    LD A,(IX+B_HALF)
+    OR A
+    JR NZ,.SHIFTED
     LD DE,BULLET_ATTR
     CALL RESTORE_ATTR_1_1
     LD DE,BULLET_SPRITE
     CALL DRAW_1_1
-
+    JR .SAVE_DRAWN
+.SHIFTED:
+    LD DE,BULLET_ATTR_PAIR
+    CALL RESTORE_ATTR_1_2
+    LD DE,BULLET_SPRITE
+    CALL DRAW_SHIFT4_1_1
+.SAVE_DRAWN:
     LD A,(IX+B_X)
     LD (IX+B_DRAW_X),A
     LD A,(IX+B_Y)
     LD (IX+B_DRAW_Y),A
+    LD A,(IX+B_HALF)
+    LD (IX+B_DRAW_HALF),A
     LD A,1
     LD (IX+B_DRAWN),A
     RET
@@ -1080,12 +1127,17 @@ ERASE_BULLET_SLOT:
     LD B,(IX+B_DRAW_Y)
     LD C,(IX+B_DRAW_X)
     LD DE,#0101
+    LD A,(IX+B_DRAW_HALF)
+    OR A
+    JR Z,.MARK
+    LD D,2
+.MARK:
     CALL STARFIELD_MARK_RECT
     XOR A
     LD (IX+B_DRAWN),A
     RET
 
-; === enemies.asm ===
+; ===== enemies.asm =====
 ; -------------------------------------------------------------
 ; ENEMIES: three asteroids falling vertically (8x8 and 16x16).
 ;
@@ -1508,6 +1560,7 @@ CHECK_SHIP_ENEMY_SLOT:
 CHECK_BULLET_ENEMIES:
     LD B,(IX+B_Y)
     LD C,(IX+B_X)
+    LD L,(IX+B_HALF)             ; bullet spans X and X+1 if L=1
     PUSH IX
     LD IX,ENEMY_POOL
     LD H,MAX_ENEMIES
@@ -1528,13 +1581,20 @@ CHECK_BULLET_ENEMIES:
     JR Z,.SKIP
 .CHECK_X:
     LD A,C
-    SUB (IX+E_X)              ; unsigned delta bulletX - enemyX
-    JR C,.SKIP
+    SUB (IX+E_X)               ; bullet base X minus asteroid left X
+    JR C,.BULLET_LEFT
     OR A
     JR Z,.HIT
     CP 1
     JR NZ,.SKIP
     LD A,(IX+E_TYPE)
+    OR A
+    JR Z,.SKIP                 ; aligned bullet right of small
+    JR .HIT
+.BULLET_LEFT:
+    CP #FF                     ; asteroid begins one cell to right?
+    JR NZ,.SKIP
+    LD A,L                     ; only a half-shifted shot reaches it
     OR A
     JR Z,.SKIP
 .HIT:
@@ -1694,7 +1754,7 @@ ERASE_ENEMY_SLOT:
     LD (IX+E_DRAWN),A
     RET
 
-; === starfield.asm ===
+; ===== starfield.asm =====
 ; -------------------------------------------------------------
 ; STARFIELD: 16 moving single-pixel stars, two slower layers.
 ;
@@ -1936,7 +1996,14 @@ STARFIELD_INVALIDATE_FOREGROUND:
     LD DE,#0101
     LD A,(BLAST_TYPE)
     OR A
+    JR NZ,.BLAST_WIDE
+    LD A,(BLAST_OWNER)
+    OR A
     JR Z,.BLAST_RECT
+    LD A,(BLAST_HALF)
+    OR A
+    JR Z,.BLAST_RECT
+.BLAST_WIDE:
     LD D,2
 .BLAST_RECT:
     CALL STARFIELD_TEST_RECT
@@ -1955,7 +2022,13 @@ STARFIELD_INVALIDATE_FOREGROUND:
     JR Z,.SKIP_BULLET
     LD B,(IX+B_DRAW_Y)
     LD C,(IX+B_DRAW_X)
-    CALL STARFIELD_TEST_CELL
+    LD DE,#0101
+    LD A,(IX+B_DRAW_HALF)
+    OR A
+    JR Z,.BULLET_RECT
+    LD D,2
+.BULLET_RECT:
+    CALL STARFIELD_TEST_RECT
     OR A
     JR Z,.SKIP_BULLET
     LD A,1
@@ -2081,7 +2154,7 @@ STARFIELD_DRAW_STAR:
     LD (HL),A
     RET
 
-; === renderer.asm ===
+; ===== renderer.asm =====
 ; -------------------------------------------------------------
 ; Selective renderer, foreground first / stars last.
 ;
@@ -2178,7 +2251,7 @@ RENDER_FRAME:
     ; asteroid pixels when a star happens to cross one.
     JP STARFIELD_DRAW_STARS
 
-; === graphics.asm ===
+; ===== graphics.asm =====
 ; -------------------------------------------------------------
 ; Opaque bitmap drawing: 8x8 / 16x8, attribute writes and clear.
 ; -------------------------------------------------------------
@@ -2253,6 +2326,33 @@ LOOP_DRAW_1_2:
     DJNZ LOOP_DRAW_1_2
     RET
     
+; A four-pixel horizontal shift splits each source byte in two.
+; RRCA x4 swaps nibbles: low nibble -> first cell's right side,
+; high nibble -> second cell's left side.
+; IN HL=top-left bitmap byte, DE=8 sprite rows.
+; OUT: 8 rows of 2 screen bytes. Clobbers AF, BC, DE, HL.
+DRAW_SHIFT4_1_1:
+    LD B,8
+.ROW:
+    LD A,(DE)
+    RRCA
+    RRCA
+    RRCA
+    RRCA
+    LD C,A
+    AND #0F
+    LD (HL),A                   ; pixel columns 4..7 in first cell
+    INC L
+    LD A,C
+    AND #F0
+    LD (HL),A                   ; columns 0..3 in second cell
+    DEC L
+    INC H
+    INC DE
+    DJNZ .ROW
+    RET
+
+
 ; -------------------------------------------------------------
 ; Clear old opaque sprite footprints WITHOUT saving the backdrop.
 ; Call on old coordinates before drawing moving background dots.
@@ -2289,7 +2389,7 @@ CLEAR_CELL_1_2:
     POP HL
     RET
 
-; === objects.asm ===
+; ===== objects.asm =====
 ; -------------------------------------------------------------
 ; Game objects are opaque. No backdrop saving or OR blending.
  ; The old image contributes cells to the dirty queue. Opaque
@@ -2326,33 +2426,7 @@ DRAW_SHIP:
     LD DE,SHIP_ATTR_PAIR
     CALL RESTORE_ATTR_1_2
     POP DE
-    JP DRAW_SHIP_SHIFT4
-
-; A four-pixel horizontal shift splits each source byte in two.
-; RRCA x4 swaps nibbles: low nibble -> first cell's right side,
-; high nibble -> second cell's left side.
-; IN HL=top-left bitmap byte, DE=8 sprite rows.
-; OUT: 8 rows of 2 screen bytes. Clobbers AF, BC, DE, HL.
-DRAW_SHIP_SHIFT4:
-    LD B,8
-.ROW:
-    LD A,(DE)
-    RRCA
-    RRCA
-    RRCA
-    RRCA
-    LD C,A
-    AND #0F
-    LD (HL),A                   ; pixel columns 4..7 in first cell
-    INC L
-    LD A,C
-    AND #F0
-    LD (HL),A                   ; columns 0..3 in second cell
-    DEC L
-    INC H
-    INC DE
-    DJNZ .ROW
-    RET
+    JP DRAW_SHIFT4_1_1
 
 ; OLD bitmap footprint is 8x8 (aligned) or 12x8 (half-shifted).
 ; Mark whole affected cells for background and star reconstruction.
@@ -2374,20 +2448,39 @@ DRAW_BLAST:
     LD A,(BLAST_TYPE)
     OR A
     JR NZ,.WIDE
-    ; Different colours for dedicated six-frame ship blast.
-    PUSH HL
+
     LD A,(BLAST_OWNER)
     OR A
-    LD DE,BLAST_ATTR_SMALL
-    JR Z,.SMALL_ATTR
+    JR Z,.ASTEROID_SMALL
+
+    ; Ship blast: choose color for this frame and reproduce
+    ; the same 4px shift as the ship's last logical position.
+    PUSH HL
     LD A,(BLAST_FRAME)
     LD E,A
     LD D,0
     LD HL,SHIP_BLAST_ATTRS
     ADD HL,DE
-    EX DE,HL
-.SMALL_ATTR:
+    LD A,(HL)
+    LD (BLAST_ATTR_PAIR),A
+    LD (BLAST_ATTR_PAIR+1),A
     POP HL
+
+    LD A,(BLAST_HALF)
+    OR A
+    JR NZ,.SHIP_SHIFTED
+    LD DE,BLAST_ATTR_PAIR
+    CALL RESTORE_ATTR_1_1
+    LD DE,(BLAST_FRAME_PTR)
+    JP DRAW_1_1
+.SHIP_SHIFTED:
+    LD DE,BLAST_ATTR_PAIR
+    CALL RESTORE_ATTR_1_2
+    LD DE,(BLAST_FRAME_PTR)
+    JP DRAW_SHIFT4_1_1
+
+.ASTEROID_SMALL:
+    LD DE,BLAST_ATTR_SMALL
     CALL RESTORE_ATTR_1_1
     LD DE,(BLAST_FRAME_PTR)
     JP DRAW_1_1
@@ -2402,7 +2495,14 @@ ERASE_BLAST:
     LD DE,#0101
     LD A,(BLAST_TYPE)
     OR A
+    JR NZ,.TWO_CELLS
+    LD A,(BLAST_OWNER)
+    OR A
     JR Z,.MARK
+    LD A,(BLAST_HALF)
+    OR A
+    JR Z,.MARK
+.TWO_CELLS:
     LD D,2
 .MARK:
     JP STARFIELD_MARK_RECT
@@ -2422,7 +2522,7 @@ CLEAR_BITMAP:
     LDIR
     RET
 
-; === ui.asm ===
+; ===== ui.asm =====
 ; -------------------------------------------------------------
 ; SpaceCan Step 07: static native ZX can-and-bar background.
 ; Artwork is unpacked once; only numbers are changed at runtime.
@@ -2566,7 +2666,7 @@ DRAW_CHAR_AT:
     CALL GET_SCREEN_ADDR
     JP DRAW_1_1
 
-; === data.asm ===
+; ===== data.asm =====
 ; -------------------------------------------------------------
 ; Sprites and state
 ; -------------------------------------------------------------
@@ -2831,6 +2931,8 @@ BULLET_SPRITE:
     DB %00011000
 BULLET_ATTR:
     DB #47                     ; bright white on black
+BULLET_ATTR_PAIR:
+    DB #47,#47                 ; bullet spans two cells at +4px
 
 BLAST_ACTIVE:
     DB 0
@@ -2845,7 +2947,11 @@ BLAST_FRAME:
 BLAST_ANIM_TIMER:
     DB BLAST_FRAME_DURATION
 BLAST_POS:
-    DB 0,0                      ; original asteroid X/Y, NO offset
+    DB 0,0                      ; base cell X/Y for blast
+BLAST_HALF:
+    DB 0                        ; 4px offset of ship blast (0 or 1)
+BLAST_ATTR_PAIR:
+    DB #46,#46                 ; dynamically selected ship blast colors
 BLAST_FRAME_PTR:
     DW BLAST_FRAME_0
 BLAST_ATTR_SMALL:
@@ -3049,7 +3155,7 @@ CAN_LABEL_VOLUME: DB "0.33",0
 
 PROGRAM_END:
 
-; === artwork.asm ===
+; ===== artwork.asm =====
 ; Z80_POCKET_IDE_SCREEN_RLE_ZERO_V1
 ; Escape: 00,count,byte = repeat; all nonzero bytes are literals.
 ; Expands to 6144 bitmap + 768 attributes at $4000.

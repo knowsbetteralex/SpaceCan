@@ -175,6 +175,7 @@ START_ENEMY_BLAST:
     LD (BLAST_TYPE),A           ; 0=8x8, 1=16x8 explosion
     XOR A
     LD (BLAST_OWNER),A         ; 0=asteroid; 1=ship
+    LD (BLAST_HALF),A          ; asteroids always cell aligned
     LD (BLAST_FRAME),A
     CALL SELECT_BLAST_FRAME
     LD A,BLAST_FRAME_DURATION
@@ -200,12 +201,9 @@ START_SHIP_EXPLOSION:
     LD (BLAST_DRAWN),A
 .OLD_GONE:
     LD HL,(SHIP_NEW_POS)
+    LD (BLAST_POS),HL           ; retain base X, don't round to next cell
     LD A,(SHIP_HALF_POS)
-    OR A
-    JR Z,.CENTERED
-    INC L                        ; 8x8 blast at the ship nose
-.CENTERED:
-    LD (BLAST_POS),HL
+    LD (BLAST_HALF),A          ; ship blast is also shifted by exactly 4px
     LD A,1
     LD (BLAST_OWNER),A
     LD (BLAST_ACTIVE),A

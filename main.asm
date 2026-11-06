@@ -1,4 +1,4 @@
-; SpaceCan Step 08: title menu, ship blast, respawn and game over.
+; SpaceCan Step 09.1: pixel-accurate bullet / explosion at half-cell X.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -21,7 +21,7 @@ SHIP_MOVE_DELAY      EQU 2
 SHIP_BANK_DELAY      EQU 5    ; ticks between 8x8 banking poses
 SHIP_BANK_HOLD       EQU 14   ; keep tilt after releasing O/P
 MAX_BULLETS          EQU 6
-BULLET_SLOT_SIZE     EQU 8
+BULLET_SLOT_SIZE     EQU 9
 MAX_ENEMIES          EQU 3
 ENEMY_SLOT_SIZE      EQU 13
 ENEMY_FRAME_DELAY    EQU 8     ; rotate once every 8 ticks
@@ -51,7 +51,7 @@ E_PHASE        EQU 12          ; initial animation timer
 
     INCLUDE "diagnostics.asm"
 
-; Each bullet slot is exactly 8 bytes (offsets from IX).
+; Each bullet slot is 9 bytes; current/drawn half-cell offsets differ.
 B_ACTIVE    EQU 0  ; 0=free, 1=just spawned, 2=flying
 B_X         EQU 1
 B_Y         EQU 2
@@ -59,7 +59,8 @@ B_DRAWN     EQU 3
 B_DRAW_X    EQU 4
 B_DRAW_Y    EQU 5
 B_DIRTY     EQU 6
-B_RESERVED  EQU 7       ; padding; no saved background
+B_HALF      EQU 7  ; spawn 4px offset (0=aligned,1=half cell)
+B_DRAW_HALF EQU 8  ; 4px offset of last drawn picture
 
 START:
     DI

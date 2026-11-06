@@ -72,6 +72,33 @@ LOOP_DRAW_1_2:
     DJNZ LOOP_DRAW_1_2
     RET
     
+; A four-pixel horizontal shift splits each source byte in two.
+; RRCA x4 swaps nibbles: low nibble -> first cell's right side,
+; high nibble -> second cell's left side.
+; IN HL=top-left bitmap byte, DE=8 sprite rows.
+; OUT: 8 rows of 2 screen bytes. Clobbers AF, BC, DE, HL.
+DRAW_SHIFT4_1_1:
+    LD B,8
+.ROW:
+    LD A,(DE)
+    RRCA
+    RRCA
+    RRCA
+    RRCA
+    LD C,A
+    AND #0F
+    LD (HL),A                   ; pixel columns 4..7 in first cell
+    INC L
+    LD A,C
+    AND #F0
+    LD (HL),A                   ; columns 0..3 in second cell
+    DEC L
+    INC H
+    INC DE
+    DJNZ .ROW
+    RET
+
+
 ; -------------------------------------------------------------
 ; Clear old opaque sprite footprints WITHOUT saving the backdrop.
 ; Call on old coordinates before drawing moving background dots.

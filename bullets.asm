@@ -1,5 +1,5 @@
 ; -------------------------------------------------------------
-; BULLET POOL (6 x 8 bytes)
+; BULLET POOL (6 x 9 bytes)
 ;
 ; A slot is reusable only when ACTIVE=0 and DRAWN=0.
 ; ACTIVE=0 free, 1 just spawned, 2 in flight.
@@ -12,7 +12,7 @@
 ; -------------------------------------------------------------
 
 ; Find a free slot and spawn a bullet directly above the ship.
-; Bullet follows the nose cell (X or X+1 when ship is half-shifted).
+; Bullet preserves the ship's exact 4px alignment at firing.
 ; DESTROYS AF, BC, DE, HL, IX.
 FIRE_BULLET:
     LD A,(BULLET_COUNT)
@@ -29,14 +29,11 @@ FIRE_BULLET:
     JR NZ,.NEXT_SLOT
 
     LD HL,(SHIP_NEW_POS)
-    LD A,(SHIP_HALF_POS)
-    OR A
-    JR Z,.NOSE_CELL
-    INC L                        ; nose crosses into the next 8px cell
-.NOSE_CELL:
     DEC H                        ; launch one row above the ship
     LD (IX+B_X),L
     LD (IX+B_Y),H
+    LD A,(SHIP_HALF_POS)
+    LD (IX+B_HALF),A            ; 0=aligned, 1=shift right 4 pixels
     LD A,1
     LD (IX+B_ACTIVE),A
     LD (IX+B_DIRTY),A
@@ -112,15 +109,39 @@ CHECK_BULLET_COLLISION:
     LD A,(BLAST_POS+1)
     CP (IX+B_Y)
     RET NZ
+
+    ; Check character-cell overlap of bullet and explosion.
+    ; A shifted 8x8 bullet can occupy B_X and B_X+1.
+    ; A large asteroid blast or shifted ship blast covers 2 cells.
     LD A,(BLAST_POS)
-    CP (IX+B_X)
+    LD C,A
+    LD A,(IX+B_X)
+    CP C
     JR Z,.ABSORB
+    JR C,.BULLET_LEFT
+
+    ; Bullet lies one cell to the right of the blast start.
+    SUB C
+    CP 1
+    RET NZ
     LD A,(BLAST_TYPE)
     OR A
-    RET Z                       ; small explosion occupies only X
-    LD A,(BLAST_POS)
+    JR NZ,.ABSORB
+    LD A,(BLAST_OWNER)
+    OR A
+    RET Z
+    LD A,(BLAST_HALF)
+    OR A
+    RET Z
+    JR .ABSORB
+
+.BULLET_LEFT:
+    LD A,(IX+B_HALF)
+    OR A
+    RET Z
+    LD A,(IX+B_X)
     INC A
-    CP (IX+B_X)
+    CP C
     RET NZ
 .ABSORB:
     JP DEACTIVATE_BULLET
@@ -151,6 +172,21 @@ RENDER_ERASE_BULLETS:
     LD A,(IX+B_DRAWN)
     OR A
     CALL NZ,ERASE_BULLET_SLOT
+
+    ; Also invalidate the new occupied area, so stars behind a
+    ; newly fired half-shifted bullet are restored on the star pass.
+    LD A,(IX+B_ACTIVE)
+    OR A
+    JR Z,.SKIP
+    LD B,(IX+B_Y)
+    LD C,(IX+B_X)
+    LD DE,#0101
+    LD A,(IX+B_HALF)
+    OR A
+    JR Z,.MARK_NEW
+    LD D,2
+.MARK_NEW:
+    CALL STARFIELD_MARK_RECT
 .SKIP:
     POP BC
     LD DE,BULLET_SLOT_SIZE
@@ -183,15 +219,26 @@ DRAW_BULLET_SLOT:
     LD B,(IX+B_Y)
     LD C,(IX+B_X)
     CALL GET_SCREEN_ADDR
+    LD A,(IX+B_HALF)
+    OR A
+    JR NZ,.SHIFTED
     LD DE,BULLET_ATTR
     CALL RESTORE_ATTR_1_1
     LD DE,BULLET_SPRITE
     CALL DRAW_1_1
-
+    JR .SAVE_DRAWN
+.SHIFTED:
+    LD DE,BULLET_ATTR_PAIR
+    CALL RESTORE_ATTR_1_2
+    LD DE,BULLET_SPRITE
+    CALL DRAW_SHIFT4_1_1
+.SAVE_DRAWN:
     LD A,(IX+B_X)
     LD (IX+B_DRAW_X),A
     LD A,(IX+B_Y)
     LD (IX+B_DRAW_Y),A
+    LD A,(IX+B_HALF)
+    LD (IX+B_DRAW_HALF),A
     LD A,1
     LD (IX+B_DRAWN),A
     RET
@@ -200,6 +247,11 @@ ERASE_BULLET_SLOT:
     LD B,(IX+B_DRAW_Y)
     LD C,(IX+B_DRAW_X)
     LD DE,#0101
+    LD A,(IX+B_DRAW_HALF)
+    OR A
+    JR Z,.MARK
+    LD D,2
+.MARK:
     CALL STARFIELD_MARK_RECT
     XOR A
     LD (IX+B_DRAWN),A

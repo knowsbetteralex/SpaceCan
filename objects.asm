@@ -34,33 +34,7 @@ DRAW_SHIP:
     LD DE,SHIP_ATTR_PAIR
     CALL RESTORE_ATTR_1_2
     POP DE
-    JP DRAW_SHIP_SHIFT4
-
-; A four-pixel horizontal shift splits each source byte in two.
-; RRCA x4 swaps nibbles: low nibble -> first cell's right side,
-; high nibble -> second cell's left side.
-; IN HL=top-left bitmap byte, DE=8 sprite rows.
-; OUT: 8 rows of 2 screen bytes. Clobbers AF, BC, DE, HL.
-DRAW_SHIP_SHIFT4:
-    LD B,8
-.ROW:
-    LD A,(DE)
-    RRCA
-    RRCA
-    RRCA
-    RRCA
-    LD C,A
-    AND #0F
-    LD (HL),A                   ; pixel columns 4..7 in first cell
-    INC L
-    LD A,C
-    AND #F0
-    LD (HL),A                   ; columns 0..3 in second cell
-    DEC L
-    INC H
-    INC DE
-    DJNZ .ROW
-    RET
+    JP DRAW_SHIFT4_1_1
 
 ; OLD bitmap footprint is 8x8 (aligned) or 12x8 (half-shifted).
 ; Mark whole affected cells for background and star reconstruction.
@@ -82,20 +56,39 @@ DRAW_BLAST:
     LD A,(BLAST_TYPE)
     OR A
     JR NZ,.WIDE
-    ; Different colours for dedicated six-frame ship blast.
-    PUSH HL
+
     LD A,(BLAST_OWNER)
     OR A
-    LD DE,BLAST_ATTR_SMALL
-    JR Z,.SMALL_ATTR
+    JR Z,.ASTEROID_SMALL
+
+    ; Ship blast: choose color for this frame and reproduce
+    ; the same 4px shift as the ship's last logical position.
+    PUSH HL
     LD A,(BLAST_FRAME)
     LD E,A
     LD D,0
     LD HL,SHIP_BLAST_ATTRS
     ADD HL,DE
-    EX DE,HL
-.SMALL_ATTR:
+    LD A,(HL)
+    LD (BLAST_ATTR_PAIR),A
+    LD (BLAST_ATTR_PAIR+1),A
     POP HL
+
+    LD A,(BLAST_HALF)
+    OR A
+    JR NZ,.SHIP_SHIFTED
+    LD DE,BLAST_ATTR_PAIR
+    CALL RESTORE_ATTR_1_1
+    LD DE,(BLAST_FRAME_PTR)
+    JP DRAW_1_1
+.SHIP_SHIFTED:
+    LD DE,BLAST_ATTR_PAIR
+    CALL RESTORE_ATTR_1_2
+    LD DE,(BLAST_FRAME_PTR)
+    JP DRAW_SHIFT4_1_1
+
+.ASTEROID_SMALL:
+    LD DE,BLAST_ATTR_SMALL
     CALL RESTORE_ATTR_1_1
     LD DE,(BLAST_FRAME_PTR)
     JP DRAW_1_1
@@ -110,7 +103,14 @@ ERASE_BLAST:
     LD DE,#0101
     LD A,(BLAST_TYPE)
     OR A
+    JR NZ,.TWO_CELLS
+    LD A,(BLAST_OWNER)
+    OR A
     JR Z,.MARK
+    LD A,(BLAST_HALF)
+    OR A
+    JR Z,.MARK
+.TWO_CELLS:
     LD D,2
 .MARK:
     JP STARFIELD_MARK_RECT

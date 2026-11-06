@@ -420,6 +420,7 @@ CHECK_SHIP_ENEMY_SLOT:
 CHECK_BULLET_ENEMIES:
     LD B,(IX+B_Y)
     LD C,(IX+B_X)
+    LD L,(IX+B_HALF)             ; bullet spans X and X+1 if L=1
     PUSH IX
     LD IX,ENEMY_POOL
     LD H,MAX_ENEMIES
@@ -440,13 +441,20 @@ CHECK_BULLET_ENEMIES:
     JR Z,.SKIP
 .CHECK_X:
     LD A,C
-    SUB (IX+E_X)              ; unsigned delta bulletX - enemyX
-    JR C,.SKIP
+    SUB (IX+E_X)               ; bullet base X minus asteroid left X
+    JR C,.BULLET_LEFT
     OR A
     JR Z,.HIT
     CP 1
     JR NZ,.SKIP
     LD A,(IX+E_TYPE)
+    OR A
+    JR Z,.SKIP                 ; aligned bullet right of small
+    JR .HIT
+.BULLET_LEFT:
+    CP #FF                     ; asteroid begins one cell to right?
+    JR NZ,.SKIP
+    LD A,L                     ; only a half-shifted shot reaches it
     OR A
     JR Z,.SKIP
 .HIT:

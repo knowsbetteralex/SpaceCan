@@ -262,6 +262,8 @@ BULLET_SPRITE:
     DB %00011000
 BULLET_ATTR:
     DB #47                     ; bright white on black
+BULLET_ATTR_PAIR:
+    DB #47,#47                 ; bullet spans two cells at +4px
 
 BLAST_ACTIVE:
     DB 0
@@ -276,7 +278,11 @@ BLAST_FRAME:
 BLAST_ANIM_TIMER:
     DB BLAST_FRAME_DURATION
 BLAST_POS:
-    DB 0,0                      ; original asteroid X/Y, NO offset
+    DB 0,0                      ; base cell X/Y for blast
+BLAST_HALF:
+    DB 0                        ; 4px offset of ship blast (0 or 1)
+BLAST_ATTR_PAIR:
+    DB #46,#46                 ; dynamically selected ship blast colors
 BLAST_FRAME_PTR:
     DW BLAST_FRAME_0
 BLAST_ATTR_SMALL:
