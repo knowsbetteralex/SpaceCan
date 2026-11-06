@@ -4,30 +4,74 @@
 ; object drawing happens after cleaning, moving stars are last.
 ; -------------------------------------------------------------
 
+; DRAW_SHIP accepts character X and an extra 4px displacement.
+; One 8x8 pose occupies 1 byte if aligned, 2 bytes if shifted.
+; IN: SHIP_NEW_POS, SHIP_HALF_POS, SHIP_BANK. Clobbers AF, BC, DE, HL.
 DRAW_SHIP:
-    ; Select one of five 8x8 pictures without changing its X/Y.
-    ; Visual bank is independent of position; hitbox = one cell.
-    LD A,(SHIP_BANK)             ; 0..4
-    ADD A,A                      ; 2-byte DW address table
+    LD A,(SHIP_BANK)
+    ADD A,A                      ; five DW sprite addresses
     LD E,A
     LD D,0
     LD HL,SHIP_FRAMES
     ADD HL,DE
     LD E,(HL)
     INC HL
-    LD D,(HL)                    ; DE -> 8-byte sprite
-    PUSH DE
+    LD D,(HL)
+    PUSH DE                      ; save 8-byte sprite source
 
     LD BC,(SHIP_NEW_POS)
     CALL GET_SCREEN_ADDR
+    LD A,(SHIP_HALF_POS)
+    OR A
+    JR NZ,.SHIFTED
+
     LD DE,SHIP_ATTR
     CALL RESTORE_ATTR_1_1
     POP DE
     JP DRAW_1_1
 
+.SHIFTED:
+    LD DE,SHIP_ATTR_PAIR
+    CALL RESTORE_ATTR_1_2
+    POP DE
+    JP DRAW_SHIP_SHIFT4
+
+; A four-pixel horizontal shift splits each source byte in two.
+; RRCA x4 swaps nibbles: low nibble -> first cell's right side,
+; high nibble -> second cell's left side.
+; IN HL=top-left bitmap byte, DE=8 sprite rows.
+; OUT: 8 rows of 2 screen bytes. Clobbers AF, BC, DE, HL.
+DRAW_SHIP_SHIFT4:
+    LD B,8
+.ROW:
+    LD A,(DE)
+    RRCA
+    RRCA
+    RRCA
+    RRCA
+    LD C,A
+    AND #0F
+    LD (HL),A                   ; pixel columns 4..7 in first cell
+    INC L
+    LD A,C
+    AND #F0
+    LD (HL),A                   ; columns 0..3 in second cell
+    DEC L
+    INC H
+    INC DE
+    DJNZ .ROW
+    RET
+
+; OLD bitmap footprint is 8x8 (aligned) or 12x8 (half-shifted).
+; Mark whole affected cells for background and star reconstruction.
 ERASE_SHIP:
     LD BC,(SHIP_CUR_POS)
     LD DE,#0101
+    LD A,(SHIP_CUR_HALF)
+    OR A
+    JR Z,.MARK
+    LD D,2
+.MARK:
     JP STARFIELD_MARK_RECT
 
 ; Small explosion: 1x1 (8x8); large: 1x2 (16x8).

@@ -1,7 +1,7 @@
 ; SpaceCan Step 08: title menu, ship blast, respawn and game over.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
-; Coordinates are in 8x8 character cells: X in low byte, Y in high byte.
+; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
 ; Cockpit HUD: Y=0..3; playfield: X=8..23, Y=4..23.
 ; Render after HALT; update logic and moving stars for NEXT frame.
 
@@ -24,7 +24,7 @@ MAX_BULLETS          EQU 6
 BULLET_SLOT_SIZE     EQU 8
 MAX_ENEMIES          EQU 3
 ENEMY_SLOT_SIZE      EQU 13
-ENEMY_FRAME_DELAY    EQU 4
+ENEMY_FRAME_DELAY    EQU 8     ; rotate once every 8 ticks
 ENEMY_RESPAWN_DELAY  EQU 24
 SHIP_BLAST_DURATION  EQU 5    ; 6 frames x 5 ticks = 0.6 sec
 SHIP_BLAST_FRAMES    EQU 6

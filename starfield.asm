@@ -219,7 +219,12 @@ STARFIELD_INVALIDATE_FOREGROUND:
     OR A
     JR Z,.BLAST
     LD BC,(SHIP_CUR_POS)
-    LD DE,#0101              ; ship is now 1x1
+    LD DE,#0101                ; aligned 8px -> 1 cell
+    LD A,(SHIP_CUR_HALF)
+    OR A
+    JR Z,.TEST_SHIP
+    LD D,2                     ; shifted 8px -> 2 cells
+.TEST_SHIP:
     CALL STARFIELD_TEST_RECT
     OR A
     JR Z,.BLAST

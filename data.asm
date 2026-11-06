@@ -66,10 +66,16 @@ SHIP_BANK_RIGHT_HARD:
 
 SHIP_ATTR:
     DB #46                      ; bright yellow on black
+SHIP_ATTR_PAIR:
+    DB #46,#46                  ; when shifted, ship spans 2 cells
 SHIP_CUR_POS:
-    DB 15,22                   ; last painted position
+    DB 15,22                   ; last drawn character X / Y
+SHIP_CUR_HALF:
+    DB 0                       ; last drawn 4px offset (0 or 1)
 SHIP_NEW_POS:
-    DB 15,22                   ; logical target
+    DB 15,22                   ; logical base cell X / Y
+SHIP_HALF_POS:
+    DB 0                       ; current 4px offset (0 or 1)
 SHIP_BANK:
     DB 2                         ; 0..4, neutral = 2
 SHIP_BANK_TARGET:
@@ -95,9 +101,9 @@ SHIP_MOVE_TIMER:
 ; freshly selected in the full corridor using an 8-bit LFSR.
 ; The initial table stores only TYPE, START_Y, ANIMATION_PHASE.
 ENEMY_START_TABLE:
-    DB 0,4,1                    ; small 8x8
-    DB 1,11,2                   ; large 16x16
-    DB 0,17,3                   ; small 8x8
+    DB 0,4,1                    ; small 8x8, first animation in 1 tick
+    DB 1,11,3                   ; large, first animation in 3 ticks
+    DB 0,17,5                   ; small, first animation in 5 ticks
 
 ENEMY_MOVE_TIMER:
     DB 4

@@ -29,6 +29,24 @@ RENDER_FRAME:
     XOR A
     LD (SHIP_DRAWN),A
 .SHIP_ERASE_DONE:
+    ; Rebuild stars in any newly touched ship cell as well.
+    ; Without this, directly writing the 8x8/12x8 bitmap could
+    ; erase star pixels in the destination without restoring them.
+    LD A,(SHIP_DIRTY)
+    OR A
+    JR Z,.SHIP_NEW_DONE
+    LD A,(SHIP_VISIBLE)
+    OR A
+    JR Z,.SHIP_NEW_DONE
+    LD BC,(SHIP_NEW_POS)
+    LD DE,#0101
+    LD A,(SHIP_HALF_POS)
+    OR A
+    JR Z,.MARK_NEW
+    LD D,2
+.MARK_NEW:
+    CALL STARFIELD_MARK_RECT
+.SHIP_NEW_DONE:
     LD A,(BLAST_DIRTY)
     OR A
     JR Z,.BLAST_ERASE_DONE
@@ -64,6 +82,8 @@ RENDER_FRAME:
     CALL DRAW_SHIP
     LD HL,(SHIP_NEW_POS)
     LD (SHIP_CUR_POS),HL
+    LD A,(SHIP_HALF_POS)
+    LD (SHIP_CUR_HALF),A
     LD A,1
     LD (SHIP_DRAWN),A
 .SHIP_DONE:

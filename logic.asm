@@ -7,43 +7,73 @@ READ_INPUT:
     CALL READ_FIRE_KEY
     RET
 
-; The 8x8 ship stays within the can corridor (X=8..23, Y=22).
-; Movement is still one cell per input tick; banking is independent:
+; The 8x8 ship stays within X=8..23, Y=22, now moving in 4px steps.
+; Banking is independent:
 ; one pose every SHIP_BANK_DELAY frames, then a short hold after
 ; release to make brief turns visible.
 READ_SHIP_HORIZONTAL:
-    LD A,(SHIP_NEW_POS)
-    LD E,A
+    ; 8x8 ship moves in 4-pixel steps (1/2 character cell).
+    ; X stores the LEFT cell; SHIP_HALF_POS=1 means +4 pixels.
+    ; Valid leftmost pixel positions are 8*8 .. 23*8.
     LD BC,#DFFE
     IN A,(C)
-    BIT 0,A                    ; P: right
+    BIT 0,A                      ; P: right
     JR NZ,.CHECK_LEFT
     LD D,4
-    LD A,E
+    LD A,(SHIP_NEW_POS)
     CP PLAYFIELD_RIGHT
-    JR Z,.SET_BANK
-    INC E
-    JR .MAYBE_MOVE
-.CHECK_LEFT:
-    BIT 1,A                    ; O: left
-    JR NZ,.NO_KEY
-    LD D,0
-    LD A,E
-    CP PLAYFIELD_LEFT
-    JR Z,.SET_BANK
-    DEC E
+    JP Z,.SET_BANK               ; last whole cell: never spill right
 
-.MAYBE_MOVE:
-    ; Banking responds immediately, but moving X is rate-limited.
     LD A,(SHIP_MOVE_TIMER)
     OR A
-    JR Z,.MOVE
+    JP NZ,.WAIT
+    LD A,(SHIP_HALF_POS)
+    OR A
+    JR Z,.HALF_RIGHT
+    ;  x+.5 -> (x+1)+0
+    XOR A
+    LD (SHIP_HALF_POS),A
+    LD HL,SHIP_NEW_POS
+    INC (HL)
+    JP .MOVED
+.HALF_RIGHT:
+    LD A,1
+    LD (SHIP_HALF_POS),A
+    JP .MOVED
+
+.CHECK_LEFT:
+    BIT 1,A                      ; O: left
+    JP NZ,.NO_KEY
+    LD D,0
+    LD A,(SHIP_NEW_POS)
+    CP PLAYFIELD_LEFT
+    JR NZ,.LEFT_ALLOWED
+    LD A,(SHIP_HALF_POS)
+    OR A
+    JP Z,.SET_BANK               ; at the leftmost pixel
+.LEFT_ALLOWED:
+    LD A,(SHIP_MOVE_TIMER)
+    OR A
+    JP NZ,.WAIT
+    LD A,(SHIP_HALF_POS)
+    OR A
+    JR NZ,.HALF_LEFT
+    ;  x+0 -> (x-1)+.5
+    LD HL,SHIP_NEW_POS
+    DEC (HL)
+    LD A,1
+    LD (SHIP_HALF_POS),A
+    JP .MOVED
+.HALF_LEFT:
+    XOR A
+    LD (SHIP_HALF_POS),A
+    JP .MOVED
+
+.WAIT:
     DEC A
     LD (SHIP_MOVE_TIMER),A
     JR .SET_BANK
-.MOVE:
-    LD A,E
-    LD (SHIP_NEW_POS),A
+.MOVED:
     LD A,SHIP_MOVE_DELAY-1
     LD (SHIP_MOVE_TIMER),A
     LD A,1
@@ -170,6 +200,11 @@ START_SHIP_EXPLOSION:
     LD (BLAST_DRAWN),A
 .OLD_GONE:
     LD HL,(SHIP_NEW_POS)
+    LD A,(SHIP_HALF_POS)
+    OR A
+    JR Z,.CENTERED
+    INC L                        ; 8x8 blast at the ship nose
+.CENTERED:
     LD (BLAST_POS),HL
     LD A,1
     LD (BLAST_OWNER),A

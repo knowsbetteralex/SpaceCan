@@ -12,7 +12,7 @@
 ; -------------------------------------------------------------
 
 ; Find a free slot and spawn a bullet directly above the ship.
-; Spawn bullet at ship X and row Y-1, aligned with the 8x8 nose.
+; Bullet follows the nose cell (X or X+1 when ship is half-shifted).
 ; DESTROYS AF, BC, DE, HL, IX.
 FIRE_BULLET:
     LD A,(BULLET_COUNT)
@@ -29,7 +29,11 @@ FIRE_BULLET:
     JR NZ,.NEXT_SLOT
 
     LD HL,(SHIP_NEW_POS)
-    ; Same character X as the 8x8 ship: bullet is aligned with nose.
+    LD A,(SHIP_HALF_POS)
+    OR A
+    JR Z,.NOSE_CELL
+    INC L                        ; nose crosses into the next 8px cell
+.NOSE_CELL:
     DEC H                        ; launch one row above the ship
     LD (IX+B_X),L
     LD (IX+B_Y),H

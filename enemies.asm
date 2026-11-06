@@ -363,11 +363,12 @@ CHECK_SHIP_ENEMY_COLLISIONS:
 CHECK_SHIP_ENEMY_SLOT:
     LD A,(GAME_STATE)
     CP STATE_PLAYING
-    RET NZ                    ; second collision cannot cost another life
+    RET NZ
     LD A,(IX+E_ACTIVE)
     OR A
     RET Z
 
+    ; Same vertical character row(s) as before.
     LD A,(SHIP_NEW_POS+1)
     SUB (IX+E_Y)
     RET C
@@ -380,16 +381,29 @@ CHECK_SHIP_ENEMY_SLOT:
     RET Z
 
 .CHECK_X:
+    ; Half-shifted ship occupies X and X+1. Aligned ship only X.
+    LD A,(IX+E_X)
+    LD C,A                      ; asteroid left edge
     LD A,(SHIP_NEW_POS)
-    SUB (IX+E_X)
-    RET C                       ; ship is left of the asteroid
+    CP C
+    JR NC,.SHIP_AT_RIGHT
+    ; Ship is one cell left of the asteroid: 4px overlap is possible.
+    LD A,(SHIP_HALF_POS)
     OR A
+    RET Z
+    LD A,(SHIP_NEW_POS)
+    INC A
+    CP C
+    RET NZ
+    JR .HIT
+.SHIP_AT_RIGHT:
+    SUB C
     JR Z,.HIT
     CP 1
-    RET NZ                      ; ship too far to the right
+    RET NZ
     LD A,(IX+E_TYPE)
     OR A
-    RET Z                       ; small asteroid is only 1 cell wide
+    RET Z                      ; small asteroid is only 1 cell wide
 .HIT:
     CALL DEACTIVATE_ENEMY
     LD A,(SHIP_LIVES)
