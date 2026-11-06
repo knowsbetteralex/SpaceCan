@@ -1,0 +1,9 @@
+{
+  "name": "SpaceCan",
+  "root": "main.asm",
+  "loadingScreen": {
+    "enabled": true,
+    "file": "assets\/spacecan_background.scr",
+    "pauseFrames": 100
+  }
+}
