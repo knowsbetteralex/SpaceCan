@@ -96,6 +96,8 @@ SHIP_LIVES:
     DB START_LIVES              ; 4 initially; collisions only decrease
 MISS_TRAVEL_ROWS:
     DB 0                        ; 0..59 asteroid-movement rows since last kill
+MISS_KILLED_THIS_TICK:
+    DB 0                        ; don't count the movement before a kill
 PRESSURE_LEVEL:
     DB 0                        ; 0..10, persistent red segments right-to-left
 PAUSE_KEY_HELD:
