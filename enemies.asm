@@ -129,10 +129,9 @@ UPDATE_ENEMY_SLOT:
     LD A,D
     CP C
     JR C,.STEP_DOWN
-    ; Count only a natural exit at the bottom, never a collision
-    ; or a bullet kill: those call DEACTIVATE_ENEMY separately.
-    CALL DEACTIVATE_ENEMY
-    JP REGISTER_MISSED_ASTEROID
+    ; Natural exit frees the slot. Pressure is based on travel
+    ; distance globally, not on how many asteroids pass the ship.
+    JP DEACTIVATE_ENEMY
 .STEP_DOWN:
     INC A
     LD (IX+E_Y),A
@@ -343,7 +342,7 @@ ON_ENEMY_HIT:
     JR NZ,.DAMAGED
     CALL START_ENEMY_BLAST
     CALL DEACTIVATE_ENEMY
-    CALL RESET_MISSED_STREAK  ; a kill clears the missed streak
+    CALL RESET_MISS_TRAVEL    ; a kill resets only the 3-screen timer
     LD A,(IX+E_TYPE)
     OR A
     LD A,64
