@@ -1,4 +1,4 @@
-; SpaceCan Step 11: distance-based pressure gauge, pause, and timed Game Over.
+; SpaceCan Step 12: six-digit score, four heart lives, gentler speed stages.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -15,7 +15,7 @@ PLAYFIELD_RIGHT      EQU 23
 PLAYFIELD_WIDTH      EQU 16
 PLAYFIELD_BOTTOM     EQU 23
 MAX_SCROLL_SPEED     EQU 3
-SCORE_BONUS_STEP     EQU 1024
+SPEED_STAGE_COUNT    EQU 5     ; 1 / 1.5 / 2 / 2.5 / 3
 START_LIVES          EQU 4
 MISS_SCREEN_ROWS      EQU PLAYFIELD_BOTTOM-PLAYFIELD_TOP+1
 MISS_DISTANCE_LIMIT   EQU MISS_SCREEN_ROWS*3 ; 3 full corridor heights without kills
@@ -83,7 +83,9 @@ START_NEW_GAME:
     XOR A
     LD (SCORE),A
     LD (SCORE+1),A
-    LD (SCORE_TIER),A
+    LD (SCORE+2),A             ; 24-bit score, up to 999999
+    LD (SPEED_LEVEL),A        ; 0..4, smooth half-speed stages
+    LD (ENEMY_SPEED_PHASE),A
     LD (MISS_TRAVEL_ROWS),A       ; a new game resets travel since last kill
     LD (PRESSURE_LEVEL),A        ; start with ten green segments
     LD A,1
