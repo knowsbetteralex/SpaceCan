@@ -471,7 +471,7 @@ STAR_POOL:
     DB 18,37,#04,1
     DB 20,114,#40,1
     DB 22,141,#02,1
-    ; Far layer: SCROLL_SPEED pixels every four frames.
+    ; Far layer: 1..3 pixels (with half-stages) every four frames.
     DB 9,178,#80,3
     DB 11,38,#08,3
     DB 13,128,#10,3
@@ -483,17 +483,47 @@ STAR_POOL:
 ; -------------------------------------------------------------
 ; Input and HUD state.
 ; -------------------------------------------------------------
-SCROLL_SPEED:      DB 1        ; auto 1..3, multiplier for star/asteroid speed
-SCORE:             DW 0        ; 0..65535, saturating 16-bit total
-SCORE_TIER:        DB 0        ; SCORE / 1024 at last bonus
-HUD_DIRTY:         DB 1        ; numeric labels need redraw
+SCROLL_SPEED:      DB 1        ; integer portion of motion speed (1..3)
+SPEED_LEVEL:       DB 0        ; stages 0..4: 1,1.5,2,2.5,3
+ENEMY_SPEED_PHASE: DB 0        ; alternates 4/3 or 3/2 enemy intervals
+SCORE:             DB 0,0,0    ; 24-bit little endian, capped at 999999
+SCORE_PRINT_WORK:  DB 0,0,0    ; scratch remainder for decimal output
+HUD_DIRTY:         DB 1        ; refresh speed, score and lives
 GAUGE_DIRTY:       DB 1        ; gauge colors need redraw
 SPACE_HELD:        DB 0
 
 HUD_LABEL_TITLE:  DB "SPACECAN: SPACE SODA",0
 HUD_LABEL_SPEED:  DB "SPEED",0
-HUD_LABEL_SCORE:  DB "SCORE",0
-HUD_LABEL_LIVES:  DB "LIVES",0
+
+; Each life is one 8x8 character, active vs spent.
+HEART_FILLED:
+    DB %00000000
+    DB %01100110
+    DB %11111111
+    DB %11111111
+    DB %11111111
+    DB %01111110
+    DB %00111100
+    DB %00011000
+HEART_OUTLINE:
+    DB %00000000
+    DB %01100110
+    DB %10011001
+    DB %10000001
+    DB %10000001
+    DB %01000010
+    DB %00100100
+    DB %00011000
+HEART_ACTIVE_ATTR: DB #42    ; bright red ink on black
+HEART_SPENT_ATTR:  DB #07    ; dim white ink on black
+
+; 100000, 10000, 1000, 100, 10 as 24-bit little-endian divisors.
+SCORE_DECIMAL_PLACES:
+    DB #A0,#86,#01
+    DB #10,#27,#00
+    DB #E8,#03,#00
+    DB #64,#00,#00
+    DB #0A,#00,#00
 
 CAN_LABEL_LEFT:   DB "SPA",0
 CAN_LABEL_RIGHT:  DB "CAN",0
