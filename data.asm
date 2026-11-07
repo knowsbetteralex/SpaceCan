@@ -94,10 +94,18 @@ GAME_STATE:
 
 SHIP_LIVES:
     DB START_LIVES              ; 4 initially; collisions only decrease
-MISSED_STREAK:
-    DB 0                        ; 0..2 escaped objects; 3rd costs life
-HUD_MISS_ATTR:
-    DB #45                      ; cyan normally, red at 2 missed
+MISS_TRAVEL_ROWS:
+    DB 0                        ; 0..59 asteroid-movement rows since last kill
+PRESSURE_LEVEL:
+    DB 0                        ; 0..10, persistent red segments right-to-left
+PAUSE_KEY_HELD:
+    DB 1                        ; ENTER edge latch (1 while entering game)
+PAUSE_PREVIOUS_STATE:
+    DB STATE_PLAYING            ; playing or exploding before pause
+PAUSE_SAVED_BITMAP:
+    DS PAUSE_TEXT_WIDTH*8,0     ; pixel bytes underneath "PAUSED"
+PAUSE_SAVED_ATTR:
+    DS PAUSE_TEXT_WIDTH,0       ; exact attributes for screen restore
 SHIP_MOVE_TIMER:
     DB 0                        ; frames until next horizontal step
 
@@ -477,13 +485,13 @@ SCROLL_SPEED:      DB 1        ; auto 1..3, multiplier for star/asteroid speed
 SCORE:             DW 0        ; 0..65535, saturating 16-bit total
 SCORE_TIER:        DB 0        ; SCORE / 1024 at last bonus
 HUD_DIRTY:         DB 1        ; numeric labels need redraw
+GAUGE_DIRTY:       DB 1        ; gauge colors need redraw
 SPACE_HELD:        DB 0
 
 HUD_LABEL_TITLE:  DB "SPACECAN: SPACE SODA",0
 HUD_LABEL_SPEED:  DB "SPEED",0
 HUD_LABEL_SCORE:  DB "SCORE",0
 HUD_LABEL_LIVES:  DB "LIVES",0
-HUD_LABEL_MISSES: DB "MISS  /3",0
 
 CAN_LABEL_LEFT:   DB "SPA",0
 CAN_LABEL_RIGHT:  DB "CAN",0
