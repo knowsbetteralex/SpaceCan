@@ -1,6 +1,6 @@
 ; -------------------------------------------------------------
-; SpaceCan Step 07: static native ZX can-and-bar background.
-; Artwork is unpacked once; only numbers are changed at runtime.
+; SpaceCan Step 11: static can background with 10-cell pressure gauge.
+; RLE artwork is unpacked once; only HUD numerals/attributes change.
 ; -------------------------------------------------------------
 DRAW_STATIC_UI:
     ; Draw the complete ZX screen, including a pure-black 16x20
@@ -22,10 +22,9 @@ DRAW_STATIC_UI:
     LD DE,HUD_LABEL_LIVES
     CALL PRINT_TEXT
 
-    ; Top-right pressure gauge, a fixed 8-cell HUD label.
-    LD BC,#0118                  ; Y=1, X=24: "MISS  /3"
-    LD DE,HUD_LABEL_MISSES
-    JP PRINT_TEXT
+    ; Gauge at Y=3, X=11..20, centered over the corridor.
+    ; Its bitmap is static; only the 10 attribute bytes change.
+    JP DRAW_PRESSURE_BAR
 
 ; Decode RLE background directly into ZX bitmap and attributes.
 ; 00,count,value => repeat byte count times; nonzero => literal byte.
@@ -61,7 +60,7 @@ LOAD_SPACE_CAN_SCREEN:
 RENDER_HUD:
     LD A,(HUD_DIRTY)
     OR A
-    RET Z
+    JR Z,.GAUGE
     XOR A
     LD (HUD_DIRTY),A
 
@@ -78,23 +77,61 @@ RENDER_HUD:
     ADD A,'0'
     LD BC,#021D                  ; lives 0..9
     CALL DRAW_CHAR_AT
+.GAUGE:
+    LD A,(GAUGE_DIRTY)
+    OR A
+    RET Z
+    XOR A
+    LD (GAUGE_DIRTY),A
+    JP RENDER_PRESSURE_GAUGE
 
-    ; Warn in red when one more asteroid would cost a life.
-    LD A,(MISSED_STREAK)
-    CP MISSES_TO_DAMAGE-1
-    LD A,#45                     ; bright cyan on black
-    JR NZ,.MISS_ATTR_READY
-    LD A,#42                     ; bright red at 2 consecutive misses
-.MISS_ATTR_READY:
-    LD (HUD_MISS_ATTR),A
-    LD BC,#011D                  ; Y=1, X=29
+; Print a narrow bright pixel bar in the topmost corridor border.
+; First clear the original .SCR bitmap in exactly 10 cells, then
+; draw a fixed 8-row glyph to give each attribute its own visible bar.
+DRAW_PRESSURE_BAR:
+    LD C,11                      ; centered 10 cells (X=11..20)
+    LD A,PRESSURE_SEGMENTS
+.NEXT:
+    PUSH AF
+    PUSH BC
+    LD B,3                       ; directly above playfield top (Y=4)
     CALL GET_SCREEN_ADDR
-    LD DE,HUD_MISS_ATTR
-    CALL RESTORE_ATTR_1_1
-    LD A,(MISSED_STREAK)
-    ADD A,'0'
-    LD BC,#011D
-    JP DRAW_CHAR_AT
+    LD DE,PRESSURE_SEGMENT_PIXELS
+    CALL DRAW_1_1
+    POP BC
+    INC C
+    POP AF
+    DEC A
+    JR NZ,.NEXT
+    XOR A
+    LD (GAUGE_DIRTY),A
+    JP RENDER_PRESSURE_GAUGE
+
+; Only 10 attribute writes per penalty. Green on the left,
+; red grows from the RIGHT. Full red is shown during the blast.
+RENDER_PRESSURE_GAUGE:
+    LD A,(PRESSURE_LEVEL)
+    LD B,A
+    LD C,PRESSURE_SEGMENTS
+    LD HL,#5800+3*32+11
+.NEXT:
+    LD A,C
+    CP B
+    JR C,.RED
+    JR Z,.RED
+    LD A,#44                     ; bright green ink / black paper
+    JR .STORE
+.RED:
+    LD A,#42                     ; bright red ink / black paper
+.STORE:
+    LD (HL),A
+    INC HL
+    DEC C
+    JR NZ,.NEXT
+    RET
+
+PRESSURE_SEGMENT_PIXELS:
+    DB #00,#7E,#7E,#7E,#7E,#7E,#7E,#00
 
 ; IN HL=0..65535, BC=YX of leftmost digit.
 ; Four repeated divisions by 10^n, ending with the units.

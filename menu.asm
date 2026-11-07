@@ -23,14 +23,18 @@ SHOW_START_MENU:
 
     LD A,#47                       ; bright white on black
     LD (MENU_TEXT_ATTR),A
-    LD BC,#0B0C                    ; O - LEFT
+    ; All four hints are horizontally symmetric about X=15.5.
+    LD BC,#0B0C                    ; 8 chars: O...LEFT
     LD DE,MENU_CONTROL_O
     CALL MENU_PRINT_TEXT
-    LD BC,#0C0C                    ; P - RIGHT
+    LD BC,#0C0C                    ; 8 chars: P..RIGHT
     LD DE,MENU_CONTROL_P
     CALL MENU_PRINT_TEXT
-    LD BC,#0D0A                    ; SPACE TO FIRE
+    LD BC,#0D0A                    ; 12 chars: SPACE...FIRE
     LD DE,MENU_CONTROL_FIRE
+    CALL MENU_PRINT_TEXT
+    LD BC,#0E0A                    ; 12 chars: ENTER..PAUSE
+    LD DE,MENU_CONTROL_PAUSE
     CALL MENU_PRINT_TEXT
     ;LD BC,#1008                    ; DODGE ASTEROIDS
     ;LD DE,MENU_HINT
@@ -106,6 +110,7 @@ RESET_ROUND_OBJECTS:
     LD (SHIP_BANK_HOLD_TIMER),A
     LD A,1
     LD (SPACE_HELD),A              ; ignore held SPACE from menu/retry
+    LD (PAUSE_KEY_HELD),A          ; ignore held ENTER from menu/retry
     LD (SHIP_VISIBLE),A
     LD (SHIP_DIRTY),A
     LD (HUD_DIRTY),A
@@ -207,13 +212,15 @@ MENU_DRAW_PROMPT:
     LD BC,#1209
     LD DE,MENU_PROMPT_PRESS
     CALL MENU_PRINT_TEXT
-    LD BC,#130A
     LD A,(MENU_PROMPT_MODE)
     OR A
-    ;LD DE,MENU_PROMPT_START
-    JR Z,.DRAW_LINE2
+    JR NZ,.RETRY
+    LD BC,#130C                   ; 8-character "TO START" is centered
+    LD DE,MENU_PROMPT_START
+    JP MENU_PRINT_TEXT
+.RETRY:
+    LD BC,#130A                   ; 12-character retry prompt
     LD DE,MENU_PROMPT_RETRY
-.DRAW_LINE2:
     JP MENU_PRINT_TEXT
 .ERASE:
     LD BC,#1209
@@ -267,6 +274,96 @@ MENU_ANY_KEY:
     XOR A
     RET
 
+; ENTER pauses both play and explosion animation on a press edge.
+; While paused, the main loop skips rendering, physics and input.
+; Save exactly the bitmap/attributes under the central 6-char label
+; and restore them byte-for-byte on resume (no dirty redraw needed).
+HANDLE_PAUSE_KEY:
+    LD BC,#BFFE                  ; H J K L ENTER keyboard row
+    IN A,(C)
+    BIT 0,A                      ; ENTER
+    JR NZ,.RELEASED
+    LD A,(PAUSE_KEY_HELD)
+    OR A
+    RET NZ
+    LD A,1
+    LD (PAUSE_KEY_HELD),A
+    LD A,(GAME_STATE)
+    CP STATE_PAUSED
+    JR Z,.RESUME
+    LD (PAUSE_PREVIOUS_STATE),A
+    LD A,STATE_PAUSED
+    LD (GAME_STATE),A
+    CALL SAVE_PAUSE_AREA
+    LD A,#47
+    LD (MENU_TEXT_ATTR),A
+    LD BC,#0C0D                 ; centered six-character PAUSED
+    LD DE,PAUSE_LABEL
+    JP MENU_PRINT_TEXT
+.RESUME:
+    CALL RESTORE_PAUSE_AREA
+    LD A,(PAUSE_PREVIOUS_STATE)
+    LD (GAME_STATE),A
+    RET
+.RELEASED:
+    XOR A
+    LD (PAUSE_KEY_HELD),A
+    RET
+
+SAVE_PAUSE_AREA:
+    LD DE,PAUSE_SAVED_BITMAP
+    LD C,PAUSE_TEXT_X
+    LD A,PAUSE_TEXT_WIDTH
+.NEXT:
+    PUSH AF
+    PUSH BC
+    LD B,PAUSE_TEXT_Y
+    CALL GET_SCREEN_ADDR
+    LD B,8
+.ROW:
+    LD A,(HL)
+    LD (DE),A
+    INC DE
+    INC H
+    DJNZ .ROW
+    POP BC
+    INC C
+    POP AF
+    DEC A
+    JR NZ,.NEXT
+    LD HL,PAUSE_ATTR_ADDR
+    LD DE,PAUSE_SAVED_ATTR
+    LD BC,PAUSE_TEXT_WIDTH
+    LDIR
+    RET
+
+RESTORE_PAUSE_AREA:
+    LD DE,PAUSE_SAVED_BITMAP
+    LD C,PAUSE_TEXT_X
+    LD A,PAUSE_TEXT_WIDTH
+.NEXT:
+    PUSH AF
+    PUSH BC
+    LD B,PAUSE_TEXT_Y
+    CALL GET_SCREEN_ADDR
+    LD B,8
+.ROW:
+    LD A,(DE)
+    LD (HL),A
+    INC DE
+    INC H
+    DJNZ .ROW
+    POP BC
+    INC C
+    POP AF
+    DEC A
+    JR NZ,.NEXT
+    LD HL,PAUSE_SAVED_ATTR
+    LD DE,PAUSE_ATTR_ADDR
+    LD BC,PAUSE_TEXT_WIDTH
+    LDIR
+    RET
+
 MENU_TEXT_ATTR:    DB #47
 MENU_LOGO_ATTRS:   DB #46,#46
 MENU_LOGO_CURSOR:  DW 0
@@ -280,6 +377,8 @@ MENU_SUBTITLE:     DB "SPACE SODA .33",0
 MENU_CONTROL_O:    DB "O...LEFT",0
 MENU_CONTROL_P:    DB "P..RIGHT",0
 MENU_CONTROL_FIRE: DB "SPACE...FIRE",0
+MENU_CONTROL_PAUSE: DB "ENTER..PAUSE",0
+PAUSE_LABEL:      DB "PAUSED",0
 MENU_HINT:         DB "DODGE ASTEROIDS",0
 MENU_GAME_OVER:    DB "GAME OVER",0
 MENU_FINAL_SCORE:  DB "FINAL SCORE",0

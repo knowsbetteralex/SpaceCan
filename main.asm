@@ -1,4 +1,4 @@
-; SpaceCan Step 10: missed-asteroid pressure penalty and timed Game Over.
+; SpaceCan Step 11: distance-based pressure gauge, pause, and timed Game Over.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -17,7 +17,9 @@ PLAYFIELD_BOTTOM     EQU 23
 MAX_SCROLL_SPEED     EQU 3
 SCORE_BONUS_STEP     EQU 1024
 START_LIVES          EQU 4
-MISSES_TO_DAMAGE     EQU 3     ; 3 consecutive escaped asteroids cost 1 life
+MISS_SCREEN_ROWS      EQU PLAYFIELD_BOTTOM-PLAYFIELD_TOP+1
+MISS_DISTANCE_LIMIT   EQU MISS_SCREEN_ROWS*3 ; 3 full corridor heights without kills
+PRESSURE_SEGMENTS     EQU 10    ; 10 penalties fill the gauge and cost a life
 GAME_OVER_FRAMES     EQU 100   ; 2 seconds at the 50Hz ZX interrupt rate
 SHIP_MOVE_DELAY      EQU 2
 SHIP_BANK_DELAY      EQU 5    ; ticks between 8x8 banking poses
@@ -35,6 +37,11 @@ STATE_PLAYING        EQU 1
 STATE_EXPLODING      EQU 2
 STATE_RESPAWN        EQU 3
 STATE_GAME_OVER      EQU 4
+STATE_PAUSED         EQU 5
+PAUSE_TEXT_Y         EQU 12
+PAUSE_TEXT_X         EQU 13
+PAUSE_TEXT_WIDTH     EQU 6
+PAUSE_ATTR_ADDR      EQU #5800 + PAUSE_TEXT_Y*32 + PAUSE_TEXT_X
 
 ; One 13-byte enemy slot: state + animation + last drawn position.
 E_ACTIVE       EQU 0
@@ -77,7 +84,8 @@ START_NEW_GAME:
     LD (SCORE),A
     LD (SCORE+1),A
     LD (SCORE_TIER),A
-    LD (MISSED_STREAK),A         ; a new GAME resets the streak
+    LD (MISS_TRAVEL_ROWS),A       ; a new game resets travel since last kill
+    LD (PRESSURE_LEVEL),A        ; start with ten green segments
     LD A,1
     LD (SCROLL_SPEED),A
     LD A,START_LIVES
@@ -87,6 +95,14 @@ START_NEW_GAME:
 ; Continue after ship explosion, preserving score/speed/lives.
 RESTART_ROUND:
     DI
+    ; A full red gauge has already consumed one life: recharge only
+    ; on respawn. Ordinary asteroid collisions preserve gauge damage.
+    LD A,(PRESSURE_LEVEL)
+    CP PRESSURE_SEGMENTS
+    JR NZ,.KEEP_PRESSURE
+    XOR A
+    LD (PRESSURE_LEVEL),A
+.KEEP_PRESSURE:
     CALL DRAW_STATIC_UI
     CALL RESET_ROUND_OBJECTS
     LD A,STATE_PLAYING
@@ -101,6 +117,13 @@ MAIN_LOOP:
     JP Z,RESTART_ROUND
     CP STATE_GAME_OVER
     JP Z,SHOW_GAME_OVER
+
+    ; Pause scan runs before rendering and game logic. While paused,
+    ; only HALT and ENTER are processed, so all animation clocks freeze.
+    CALL HANDLE_PAUSE_KEY
+    LD A,(GAME_STATE)
+    CP STATE_PAUSED
+    JR Z,.FRAME_END
 
     DEBUG_PHASE DBG_RENDER_COLOUR
     CALL RENDER_FRAME
