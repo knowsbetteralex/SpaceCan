@@ -2,8 +2,9 @@
 ; STARFIELD: 16 moving single-pixel stars, two slower layers.
 ;
 ; Record: X character cell, Y pixel, pixel bit mask, period mask.
-; Period 1: +speed pixels every 2 frames.
-; Period 3: +speed pixels every 4 frames. speed=1..3.
+; Period 1: +1..3 pixels every 2 frames.
+; Period 3: +1..3 pixels every 4 frames.
+; Half-speed stages alternate +1/+2 or +2/+3 pixel steps.
 ;
 ; Render order:
 ;   1) invalidate foreground sprites touched by star changes;
@@ -183,10 +184,17 @@ STARFIELD_UPDATE:
     JR NZ,.SKIP
 
     CALL STARFIELD_MARK_STAR  ; old character cell
-    ; Both remaining layers use the same pixel step (1..3).
-    ; S_PERIOD changes only how often the star takes that step.
+    ; Smooth stages 1,1.5,2,2.5,3 using STAR_CLOCK bit 2.
     LD A,(SCROLL_SPEED)
     LD C,A
+    LD A,(SPEED_LEVEL)
+    AND 1
+    JR Z,.STEP_READY
+    LD A,(STAR_CLOCK)
+    AND 4
+    JR Z,.STEP_READY
+    INC C
+.STEP_READY:
     LD A,(IX+S_Y)
     ADD A,C
     CP 192
