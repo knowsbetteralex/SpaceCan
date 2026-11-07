@@ -1,4 +1,4 @@
-; SpaceCan Step 12: six-digit score, four heart lives, gentler speed stages.
+; SpaceCan Step 12.1: per-life penalty reset, six-digit score and heart lives.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -94,17 +94,15 @@ START_NEW_GAME:
     LD (SHIP_LIVES),A
     JP RESTART_ROUND
 
-; Continue after ship explosion, preserving score/speed/lives.
+; Each new ship starts without pressure, preserving score/speed/lives.
 RESTART_ROUND:
     DI
-    ; A full red gauge has already consumed one life: recharge only
-    ; on respawn. Ordinary asteroid collisions preserve gauge damage.
-    LD A,(PRESSURE_LEVEL)
-    CP PRESSURE_SEGMENTS
-    JR NZ,.KEEP_PRESSURE
+    ; Pressure is local to ONE life, regardless of how it was lost.
+    ; Also reset the partial 3-screen distance on every respawn.
     XOR A
     LD (PRESSURE_LEVEL),A
-.KEEP_PRESSURE:
+    LD (MISS_TRAVEL_ROWS),A
+    LD (MISS_KILLED_THIS_TICK),A
     CALL DRAW_STATIC_UI
     CALL RESET_ROUND_OBJECTS
     LD A,STATE_PLAYING
