@@ -90,6 +90,11 @@ UPDATE_ENEMIES:
     RET
 
 UPDATE_ENEMY_SLOT:
+    ; If the preceding asteroid caused Game Over, don't move more
+    ; objects in this tick. The loop still advances IX safely.
+    LD A,(GAME_STATE)
+    CP STATE_PLAYING
+    RET NZ
     LD A,(IX+E_ACTIVE)
     OR A
     JP Z,.INACTIVE
@@ -123,7 +128,12 @@ UPDATE_ENEMY_SLOT:
 .CHECK_BOTTOM:
     LD A,D
     CP C
-    JP NC,DEACTIVATE_ENEMY
+    JR C,.STEP_DOWN
+    ; Count only a natural exit at the bottom, never a collision
+    ; or a bullet kill: those call DEACTIVATE_ENEMY separately.
+    CALL DEACTIVATE_ENEMY
+    JP REGISTER_MISSED_ASTEROID
+.STEP_DOWN:
     INC A
     LD (IX+E_Y),A
     LD A,1
@@ -333,6 +343,7 @@ ON_ENEMY_HIT:
     JR NZ,.DAMAGED
     CALL START_ENEMY_BLAST
     CALL DEACTIVATE_ENEMY
+    CALL RESET_MISSED_STREAK  ; a kill clears the missed streak
     LD A,(IX+E_TYPE)
     OR A
     LD A,64

@@ -1,4 +1,4 @@
-; SpaceCan Step 09.1: pixel-accurate bullet / explosion at half-cell X.
+; SpaceCan Step 10: missed-asteroid pressure penalty and timed Game Over.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -17,6 +17,8 @@ PLAYFIELD_BOTTOM     EQU 23
 MAX_SCROLL_SPEED     EQU 3
 SCORE_BONUS_STEP     EQU 1024
 START_LIVES          EQU 4
+MISSES_TO_DAMAGE     EQU 3     ; 3 consecutive escaped asteroids cost 1 life
+GAME_OVER_FRAMES     EQU 100   ; 2 seconds at the 50Hz ZX interrupt rate
 SHIP_MOVE_DELAY      EQU 2
 SHIP_BANK_DELAY      EQU 5    ; ticks between 8x8 banking poses
 SHIP_BANK_HOLD       EQU 14   ; keep tilt after releasing O/P
@@ -75,6 +77,7 @@ START_NEW_GAME:
     LD (SCORE),A
     LD (SCORE+1),A
     LD (SCORE_TIER),A
+    LD (MISSED_STREAK),A         ; a new GAME resets the streak
     LD A,1
     LD (SCROLL_SPEED),A
     LD A,START_LIVES

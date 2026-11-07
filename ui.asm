@@ -20,6 +20,11 @@ DRAW_STATIC_UI:
     CALL PRINT_TEXT
     LD BC,#0217                  ; LIVES
     LD DE,HUD_LABEL_LIVES
+    CALL PRINT_TEXT
+
+    ; Top-right pressure gauge, a fixed 8-cell HUD label.
+    LD BC,#0118                  ; Y=1, X=24: "MISS  /3"
+    LD DE,HUD_LABEL_MISSES
     JP PRINT_TEXT
 
 ; Decode RLE background directly into ZX bitmap and attributes.
@@ -72,6 +77,23 @@ RENDER_HUD:
     LD A,(SHIP_LIVES)
     ADD A,'0'
     LD BC,#021D                  ; lives 0..9
+    CALL DRAW_CHAR_AT
+
+    ; Warn in red when one more asteroid would cost a life.
+    LD A,(MISSED_STREAK)
+    CP MISSES_TO_DAMAGE-1
+    LD A,#45                     ; bright cyan on black
+    JR NZ,.MISS_ATTR_READY
+    LD A,#42                     ; bright red at 2 consecutive misses
+.MISS_ATTR_READY:
+    LD (HUD_MISS_ATTR),A
+    LD BC,#011D                  ; Y=1, X=29
+    CALL GET_SCREEN_ADDR
+    LD DE,HUD_MISS_ATTR
+    CALL RESTORE_ATTR_1_1
+    LD A,(MISSED_STREAK)
+    ADD A,'0'
+    LD BC,#011D
     JP DRAW_CHAR_AT
 
 ; IN HL=0..65535, BC=YX of leftmost digit.

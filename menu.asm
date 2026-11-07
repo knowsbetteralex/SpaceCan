@@ -6,7 +6,7 @@
 ; PLAYING: the existing main-loop renderer and logic.
 ; EXPLODING: only 8x8 ship explosion advances, ship is hidden.
 ; RESPAWN: same score, speed and remaining lives, fresh actors.
-; GAME OVER: final score displayed; any key starts a new game.
+; GAME OVER: show final score for 2 seconds, then return to menu.
 ; -------------------------------------------------------------
 
 SHOW_START_MENU:
@@ -50,7 +50,7 @@ SHOW_GAME_OVER:
     CALL DRAW_STATIC_UI
     LD A,1
     LD (HUD_DIRTY),A
-    CALL RENDER_HUD                 ; final speed / score / 0 lives
+    CALL RENDER_HUD                 ; final speed, score and 0 lives
 
     LD A,#42                       ; bright red on black
     LD (MENU_TEXT_ATTR),A
@@ -58,7 +58,7 @@ SHOW_GAME_OVER:
     LD DE,MENU_GAME_OVER
     CALL MENU_PRINT_TEXT
 
-    LD A,#47
+    LD A,#47                       ; bright white on black
     LD (MENU_TEXT_ATTR),A
     LD BC,#0C0A
     LD DE,MENU_FINAL_SCORE
@@ -67,12 +67,18 @@ SHOW_GAME_OVER:
     LD BC,#0E0D
     CALL PRINT_DEC5
 
-    LD A,1
-    LD (MENU_PROMPT_MODE),A        ; TO TRY AGAIN
-    CALL MENU_INIT_PROMPT
+    LD BC,#120A
+    LD DE,MENU_BACK_TO_TITLE
+    CALL MENU_PRINT_TEXT
+
+    ; 100 frame interrupts = approximately two seconds on 48K.
+    ; Future music can be started before this wait loop.
     EI
-    CALL MENU_WAIT_ANY_KEY
-    JP START_NEW_GAME
+    LD B,GAME_OVER_FRAMES
+.HOLD:
+    HALT
+    DJNZ .HOLD
+    JP SHOW_START_MENU            ; NOT a direct game restart
 
 ; Keep score/speed/lives untouched. Reset only transient game state.
 RESET_ROUND_OBJECTS:
@@ -277,6 +283,7 @@ MENU_CONTROL_FIRE: DB "SPACE...FIRE",0
 MENU_HINT:         DB "DODGE ASTEROIDS",0
 MENU_GAME_OVER:    DB "GAME OVER",0
 MENU_FINAL_SCORE:  DB "FINAL SCORE",0
+MENU_BACK_TO_TITLE: DB "BACK TO MENU",0
 MENU_PROMPT_PRESS: DB "PRESS ANY KEY!",0
 MENU_PROMPT_START: DB "TO START",0
 MENU_PROMPT_RETRY: DB "TO TRY AGAIN",0

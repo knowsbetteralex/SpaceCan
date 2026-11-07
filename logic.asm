@@ -151,6 +151,9 @@ READ_FIRE_KEY:
 UPDATE_GAME:
     CALL UPDATE_BLAST_ANIM
     CALL UPDATE_ENEMIES
+    LD A,(GAME_STATE)
+    CP STATE_PLAYING
+    RET NZ                      ; a missed asteroid may end the game
     CALL UPDATE_BULLETS
     CALL CHECK_SHIP_ENEMY_COLLISIONS
     LD A,(GAME_STATE)
@@ -334,3 +337,45 @@ CHECK_SCORE_BONUS:
     LD (HUD_DIRTY),A
     RET
 
+
+; -------------------------------------------------------------
+; Missed-asteroid pressure on the Space Soda can:
+; - exactly three consecutive escapes cost one life
+; - any destroyed asteroid resets the streak
+; - an asteroid that hits the ship does NOT count as an escape
+; - while 1+ lives remain, stay in the same round and speed
+; - a zero-life pressure penalty goes directly to timed Game Over
+; -------------------------------------------------------------
+REGISTER_MISSED_ASTEROID:
+    LD A,(MISSED_STREAK)
+    INC A
+    CP MISSES_TO_DAMAGE
+    JR C,.SAVE_STREAK
+    XOR A
+    LD (MISSED_STREAK),A        ; three escapes completed a group
+    LD A,(SHIP_LIVES)
+    OR A
+    JR Z,.UI                   ; avoid life underflow
+    DEC A
+    LD (SHIP_LIVES),A
+    OR A
+    JR NZ,.UI
+    LD A,STATE_GAME_OVER
+    LD (GAME_STATE),A
+    JR .UI
+.SAVE_STREAK:
+    LD (MISSED_STREAK),A
+.UI:
+    LD A,1
+    LD (HUD_DIRTY),A
+    RET
+
+RESET_MISSED_STREAK:
+    LD A,(MISSED_STREAK)
+    OR A
+    RET Z
+    XOR A
+    LD (MISSED_STREAK),A
+    LD A,1
+    LD (HUD_DIRTY),A
+    RET

@@ -94,6 +94,10 @@ GAME_STATE:
 
 SHIP_LIVES:
     DB START_LIVES              ; 4 initially; collisions only decrease
+MISSED_STREAK:
+    DB 0                        ; 0..2 escaped objects; 3rd costs life
+HUD_MISS_ATTR:
+    DB #45                      ; cyan normally, red at 2 missed
 SHIP_MOVE_TIMER:
     DB 0                        ; frames until next horizontal step
 
@@ -479,6 +483,7 @@ HUD_LABEL_TITLE:  DB "SPACECAN: SPACE SODA",0
 HUD_LABEL_SPEED:  DB "SPEED",0
 HUD_LABEL_SCORE:  DB "SCORE",0
 HUD_LABEL_LIVES:  DB "LIVES",0
+HUD_LABEL_MISSES: DB "MISS  /3",0
 
 CAN_LABEL_LEFT:   DB "SPA",0
 CAN_LABEL_RIGHT:  DB "CAN",0
