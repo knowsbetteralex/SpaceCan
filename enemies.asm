@@ -61,7 +61,7 @@ INIT_ENEMIES:
     LD (ENEMY_MOVE_TIMER),A
     RET
 
-; Automatic speed 1..3 controls vertical move period: 4..2 ticks.
+; Smooth speed stages: asteroid motion intervals 4 / 4-3 / 3 / 3-2 / 2 ticks.
 UPDATE_ENEMIES:
     LD A,(ENEMY_MOVE_TIMER)
     DEC A
@@ -70,6 +70,19 @@ UPDATE_ENEMIES:
     LD A,5
     LD HL,SCROLL_SPEED
     SUB (HL)
+    LD C,A                       ; base interval 4, 3 or 2 ticks
+    LD A,(SPEED_LEVEL)
+    AND 1
+    JR Z,.PERIOD_READY
+    ; Half-speed stages alternate 4/3 or 3/2 intervals.
+    LD A,(ENEMY_SPEED_PHASE)
+    XOR 1
+    LD (ENEMY_SPEED_PHASE),A
+    OR A
+    JR Z,.PERIOD_READY
+    DEC C
+.PERIOD_READY:
+    LD A,C
     LD (ENEMY_MOVE_TIMER),A
     LD A,1
     LD (ENEMY_MOVE_NOW),A
@@ -336,7 +349,7 @@ DEACTIVATE_ENEMY:
 
 ; IX -> enemy: score is awarded only on destruction.
 ; Small = 64 points, large = 128 points; difficulty checks happen
-; after the score changes so every 1024-point threshold is caught.
+; after the score changes so even crossed milestones are caught.
 ON_ENEMY_HIT:
     DEC (IX+E_HP)
     JR NZ,.DAMAGED
