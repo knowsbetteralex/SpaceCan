@@ -1,5 +1,5 @@
 ; -------------------------------------------------------------
-; SpaceCan Step 11: static can background with 10-cell pressure gauge.
+; SpaceCan Step 12: six score digits in right window and four heart lives.
 ; RLE artwork is unpacked once; only HUD numerals/attributes change.
 ; -------------------------------------------------------------
 DRAW_STATIC_UI:
@@ -15,12 +15,8 @@ DRAW_STATIC_UI:
     LD BC,#0201                  ; SPEED
     LD DE,HUD_LABEL_SPEED
     CALL PRINT_TEXT
-    LD BC,#020B                  ; SCORE
-    LD DE,HUD_LABEL_SCORE
-    CALL PRINT_TEXT
-    LD BC,#0217                  ; LIVES
-    LD DE,HUD_LABEL_LIVES
-    CALL PRINT_TEXT
+    ; Middle window Y=2, X=14..17: four heart sprites.
+    ; Right window Y=2, X=25..30: 6 score digits, without label.
 
     ; Gauge at Y=3, X=11..20, centered over the corridor.
     ; Its bitmap is static; only the 10 attribute bytes change.
@@ -56,7 +52,7 @@ LOAD_SPACE_CAN_SCREEN:
     JR NZ,.NEXT
     RET
 
-; Draw no more than 7 characters when a reading changes.
+; Dynamic HUD updates only when values change.
 RENDER_HUD:
     LD A,(HUD_DIRTY)
     OR A
@@ -64,19 +60,34 @@ RENDER_HUD:
     XOR A
     LD (HUD_DIRTY),A
 
+    ; Left window: 1 / 1.5 / 2 / 2.5 / 3, clearing the old suffix.
     LD A,(SCROLL_SPEED)
     ADD A,'0'
-    LD BC,#0207                  ; SPEED number
+    LD BC,#0207
+    CALL DRAW_CHAR_AT
+    LD A,(SPEED_LEVEL)
+    AND 1
+    JR Z,.WHOLE_SPEED
+    LD A,'.'
+    LD BC,#0208
+    CALL DRAW_CHAR_AT
+    LD A,'5'
+    JR .SPEED_SUFFIX
+.WHOLE_SPEED:
+    LD A,' '
+    LD BC,#0208
+    CALL DRAW_CHAR_AT
+    LD A,' '
+.SPEED_SUFFIX:
+    LD BC,#0209
     CALL DRAW_CHAR_AT
 
-    LD HL,(SCORE)
-    LD BC,#0210                  ; 5 digits: 00000..65535
-    CALL PRINT_DEC5
+    ; Middle window: 4 filled/hollow hearts at X=14..17.
+    CALL DRAW_LIVES_HEARTS
 
-    LD A,(SHIP_LIVES)
-    ADD A,'0'
-    LD BC,#021D                  ; lives 0..9
-    CALL DRAW_CHAR_AT
+    ; Right window: six actual decimal digits, 000000..999999.
+    LD BC,#0219                  ; Y=2, X=25
+    CALL PRINT_DEC6
 .GAUGE:
     LD A,(GAUGE_DIRTY)
     OR A
@@ -84,6 +95,42 @@ RENDER_HUD:
     XOR A
     LD (GAUGE_DIRTY),A
     JP RENDER_PRESSURE_GAUGE
+
+; Draw four hearts in Y=2, X=14..17. Each slot index is compared
+; to remaining SHIP_LIVES; lost lives remain visible as outlines.
+DRAW_LIVES_HEARTS:
+    LD C,14
+    LD A,START_LIVES
+.NEXT_HEART:
+    PUSH AF
+    PUSH BC
+    LD B,2
+    CALL GET_SCREEN_ADDR
+    LD A,(SHIP_LIVES)
+    ADD A,14
+    CP C
+    JR C,.SPENT
+    JR Z,.SPENT
+    LD DE,HEART_FILLED
+    PUSH DE
+    LD DE,HEART_ACTIVE_ATTR
+    CALL RESTORE_ATTR_1_1
+    POP DE
+    JR .DRAW
+.SPENT:
+    LD DE,HEART_OUTLINE
+    PUSH DE
+    LD DE,HEART_SPENT_ATTR
+    CALL RESTORE_ATTR_1_1
+    POP DE
+.DRAW:
+    CALL DRAW_1_1
+    POP BC
+    INC C
+    POP AF
+    DEC A
+    JR NZ,.NEXT_HEART
+    RET
 
 ; Print a narrow bright pixel bar in the topmost corridor border.
 ; First clear the original .SCR bitmap in exactly 10 cells, then
@@ -133,41 +180,61 @@ RENDER_PRESSURE_GAUGE:
 PRESSURE_SEGMENT_PIXELS:
     DB #00,#7E,#7E,#7E,#7E,#7E,#7E,#00
 
-; IN HL=0..65535, BC=YX of leftmost digit.
-; Four repeated divisions by 10^n, ending with the units.
-; Dynamic HUD only: straightforward code is preferred to speed.
-PRINT_DEC5:
-    LD DE,10000
-    CALL PRINT_DEC_PLACE
-    LD DE,1000
-    CALL PRINT_DEC_PLACE
-    LD DE,100
-    CALL PRINT_DEC_PLACE
-    LD DE,10
-    CALL PRINT_DEC_PLACE
-    LD A,L
+; Draw six digits of 24-bit SCORE (little endian) in decimal.
+; IN BC=YX of first digit. Scratch is SCORE_PRINT_WORK; SCORE is kept.
+; This routine runs only on HUD updates or in Game Over.
+PRINT_DEC6:
+    LD HL,(SCORE)
+    LD (SCORE_PRINT_WORK),HL
+    LD A,(SCORE+2)
+    LD (SCORE_PRINT_WORK+2),A
+    LD IX,SCORE_DECIMAL_PLACES
+    LD A,5                        ; five 24-bit divisors, then units
+.NEXT_PLACE:
+    PUSH AF
+    CALL PRINT_DEC24_PLACE
+    LD DE,3
+    ADD IX,DE
+    POP AF
+    DEC A
+    JR NZ,.NEXT_PLACE
+    LD A,(SCORE_PRINT_WORK)       ; final remainder is 0..9
     ADD A,'0'
     JP DRAW_CHAR_AT
 
-; IN HL=remainder, DE=decimal place, BC=YX.
-; OUT HL=remainder after quotient, C advanced one screen column.
-PRINT_DEC_PLACE:
-    LD A,'0'
-.NEXT:
-    OR A                         ; clear carry before SBC HL,DE
-    SBC HL,DE
+; IN IX -> three-byte divisor, BC=YX. Draws one digit, increments C.
+; Each place subtracts at most nine times. Preserves IX and B.
+PRINT_DEC24_PLACE:
+    LD D,'0'
+.TRY:
+    LD A,(SCORE_PRINT_WORK+2)
+    CP (IX+2)
     JR C,.WRITE
-    INC A
-    JR .NEXT
+    JR NZ,.SUBTRACT
+    LD A,(SCORE_PRINT_WORK+1)
+    CP (IX+1)
+    JR C,.WRITE
+    JR NZ,.SUBTRACT
+    LD A,(SCORE_PRINT_WORK)
+    CP (IX+0)
+    JR C,.WRITE
+.SUBTRACT:
+    LD A,(SCORE_PRINT_WORK)
+    SUB (IX+0)
+    LD (SCORE_PRINT_WORK),A
+    LD A,(SCORE_PRINT_WORK+1)
+    SBC A,(IX+1)
+    LD (SCORE_PRINT_WORK+1),A
+    LD A,(SCORE_PRINT_WORK+2)
+    SBC A,(IX+2)
+    LD (SCORE_PRINT_WORK+2),A
+    INC D
+    JR .TRY
 .WRITE:
-    ADD HL,DE                    ; undo the final underflow
-    PUSH HL
-    PUSH DE
+    LD A,D
     PUSH BC
     CALL DRAW_CHAR_AT
     POP BC
-    POP DE
-    POP HL
     INC C
     RET
 
