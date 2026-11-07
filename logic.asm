@@ -159,6 +159,11 @@ UPDATE_GAME:
     LD A,(GAME_STATE)
     CP STATE_PLAYING
     RET NZ                     ; ship destroyed: freeze starfield
+    ; Count world distance AFTER bullets: a kill in this tick resets it.
+    CALL UPDATE_MISS_PRESSURE
+    LD A,(GAME_STATE)
+    CP STATE_PLAYING
+    RET NZ
     CALL STARFIELD_UPDATE
     RET
 
@@ -339,43 +344,44 @@ CHECK_SCORE_BONUS:
 
 
 ; -------------------------------------------------------------
-; Missed-asteroid pressure on the Space Soda can:
-; - exactly three consecutive escapes cost one life
-; - any destroyed asteroid resets the streak
-; - an asteroid that hits the ship does NOT count as an escape
-; - while 1+ lives remain, stay in the same round and speed
-; - a zero-life pressure penalty goes directly to timed Game Over
+; Pressure grows with world travel, NOT with count of escaped objects.
+; Every downward movement is one of 20 rows in a corridor crossing.
+; Three complete corridor heights (60 moves) with no asteroid kill
+; add ONE permanent red segment. Any kill resets only the travel timer,
+; never the accumulated gauge. At ten red segments a life is lost
+; through the normal ship-explosion/respawn sequence.
 ; -------------------------------------------------------------
-REGISTER_MISSED_ASTEROID:
-    LD A,(MISSED_STREAK)
-    INC A
-    CP MISSES_TO_DAMAGE
-    JR C,.SAVE_STREAK
-    XOR A
-    LD (MISSED_STREAK),A        ; three escapes completed a group
+UPDATE_MISS_PRESSURE:
+    LD A,(ENEMY_MOVE_NOW)
+    OR A
+    RET Z                         ; count movement, not 50Hz frames
+    LD HL,MISS_TRAVEL_ROWS
+    INC (HL)
+    LD A,(HL)
+    CP MISS_DISTANCE_LIMIT
+    RET C                         ; fewer than 3 screens since last kill
+    LD (HL),0                     ; begin the next 3-screen interval
+
+    LD HL,PRESSURE_LEVEL
+    INC (HL)                      ; once red, segments never turn green
+    LD A,1
+    LD (GAUGE_DIRTY),A
+    LD A,(PRESSURE_LEVEL)
+    CP PRESSURE_SEGMENTS
+    RET C
+
+    ; Full red bar takes one life and triggers the familiar ship blast.
     LD A,(SHIP_LIVES)
     OR A
-    JR Z,.UI                   ; avoid life underflow
+    RET Z
     DEC A
     LD (SHIP_LIVES),A
-    OR A
-    JR NZ,.UI
-    LD A,STATE_GAME_OVER
-    LD (GAME_STATE),A
-    JR .UI
-.SAVE_STREAK:
-    LD (MISSED_STREAK),A
-.UI:
     LD A,1
     LD (HUD_DIRTY),A
-    RET
+    JP START_SHIP_EXPLOSION
 
-RESET_MISSED_STREAK:
-    LD A,(MISSED_STREAK)
-    OR A
-    RET Z
+; Called ONLY for an asteroid destroyed by bullets.
+RESET_MISS_TRAVEL:
     XOR A
-    LD (MISSED_STREAK),A
-    LD A,1
-    LD (HUD_DIRTY),A
+    LD (MISS_TRAVEL_ROWS),A
     RET
