@@ -305,45 +305,77 @@ SELECT_BLAST_FRAME:
     RET
 
 ; -------------------------------------------------------------
-; Score/bonus: 16-bit total, +64 small / +128 large on destruction.
-; IN A=points (64 or 128). Preserves IX.
-; At SCORE=1024 and 2048 increase speed, maximum 3.
-; Lives start at 4 and NEVER increase; impacts only decrease them.
+; Score/bonus: 24-bit total (capped at 999999).
+; Small = 64, large = 128 points. Gentle speed milestones:
+; 4096, 8192, 16384, 32768 => stages 1..4 (start stage 0).
 ; -------------------------------------------------------------
 ADD_SCORE_A:
     LD E,A
     LD D,0
     LD HL,(SCORE)
     ADD HL,DE
-    JR NC,.STORE
-    LD HL,#FFFF                 ; do not wrap a long-running game
-.STORE:
     LD (SCORE),HL
+    LD A,(SCORE+2)
+    ADC A,0
+    LD (SCORE+2),A
+
+    ; Saturate at 999999 = #0F423F, not at 16-bit #FFFF.
+    CP #0F
+    JR C,.IN_RANGE
+    JR NZ,.CAP
+    LD HL,(SCORE)
+    LD DE,#4240                 ; first value beyond 999999
+    OR A
+    SBC HL,DE
+    JR C,.IN_RANGE
+.CAP:
+    LD HL,#423F
+    LD (SCORE),HL
+    LD A,#0F
+    LD (SCORE+2),A
+.IN_RANGE:
     LD A,1
     LD (HUD_DIRTY),A
     JP CHECK_SCORE_BONUS
 
+; Thresholds align to #1000/#2000/#4000/#8000.
 CHECK_SCORE_BONUS:
-    LD HL,(SCORE)
-    LD A,H
-    SRL A
-    SRL A                       ; A = SCORE / 1024 (0..63)
-    LD HL,SCORE_TIER
+    LD A,(SCORE+2)
+    OR A
+    JR NZ,.STAGE_4
+    LD A,(SCORE+1)
+    CP #80
+    JR NC,.STAGE_4
+    CP #40
+    JR NC,.STAGE_3
+    CP #20
+    JR NC,.STAGE_2
+    CP #10
+    JR NC,.STAGE_1
+    XOR A
+    JR .STORE
+.STAGE_1:
+    LD A,1
+    JR .STORE
+.STAGE_2:
+    LD A,2
+    JR .STORE
+.STAGE_3:
+    LD A,3
+    JR .STORE
+.STAGE_4:
+    LD A,4
+.STORE:
+    LD HL,SPEED_LEVEL
     CP (HL)
     RET Z
-    RET C                       ; no rewards on score reduction
     LD (HL),A
-
-    LD A,(SCROLL_SPEED)
-    CP MAX_SCROLL_SPEED
-    JR NC,.HUD
-    INC A
+    SRL A                       ; stage 0..4 => 0,0,1,1,2
+    INC A                       ; integer portion 1..3
     LD (SCROLL_SPEED),A
-.HUD:
     LD A,1
     LD (HUD_DIRTY),A
     RET
-
 
 ; -------------------------------------------------------------
 ; Pressure grows with world travel, NOT with count of escaped objects.
