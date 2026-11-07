@@ -149,6 +149,8 @@ READ_FIRE_KEY:
 ; The logic always runs after render and works only with game state.
 ; Blast first: a new hit starts from full frame 0 duration.
 UPDATE_GAME:
+    XOR A
+    LD (MISS_KILLED_THIS_TICK),A
     CALL UPDATE_BLAST_ANIM
     CALL UPDATE_ENEMIES
     LD A,(GAME_STATE)
@@ -352,6 +354,9 @@ CHECK_SCORE_BONUS:
 ; through the normal ship-explosion/respawn sequence.
 ; -------------------------------------------------------------
 UPDATE_MISS_PRESSURE:
+    LD A,(MISS_KILLED_THIS_TICK)
+    OR A
+    RET NZ                        ; a destruction restarted the timer
     LD A,(ENEMY_MOVE_NOW)
     OR A
     RET Z                         ; count movement, not 50Hz frames
@@ -384,4 +389,6 @@ UPDATE_MISS_PRESSURE:
 RESET_MISS_TRAVEL:
     XOR A
     LD (MISS_TRAVEL_ROWS),A
+    INC A
+    LD (MISS_KILLED_THIS_TICK),A
     RET
