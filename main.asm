@@ -73,6 +73,8 @@ B_DRAW_HALF EQU 8  ; 4px offset of last drawn picture
 
 START:
     DI
+    LD A,1
+    OUT (#FE),A
     IM 1                         ; 48K ROM interrupt handler
     EI
     JP SHOW_START_MENU

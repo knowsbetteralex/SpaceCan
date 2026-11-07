@@ -6,7 +6,7 @@
 ; sound, use a shared #FE output routine to preserve MIC/EAR bits.
 ; -------------------------------------------------------------
 
-DEBUG_BORDER EQU 1
+DEBUG_BORDER EQU 0
 
 DBG_RENDER_COLOUR EQU 2  ; red: sprites/background
 DBG_HUD_COLOUR    EQU 6  ; yellow: HUD
