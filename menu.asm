@@ -128,8 +128,8 @@ RESET_ROUND_OBJECTS:
     LD (BLAST_FRAME_PTR),HL
     RET
 
-; 8 custom 16x16 pixel letters spanning X=8..23, Y=6..7.
-; 5x7 bitmaps are expanded 2x in both directions with margins.
+; The selected SpaceCan Variant #1 is pixel-perfect 16x16
+; per glyph, X=8..23, Y=6..7. Dithered blue/cyan-style shading.
 DRAW_MENU_LOGO:
     LD HL,MENU_LOGO_POINTERS
     LD (MENU_LOGO_CURSOR),HL
@@ -161,7 +161,7 @@ MENU_DRAW_16X16:
     PUSH BC
     PUSH DE
     CALL GET_SCREEN_ADDR
-    LD DE,MENU_LOGO_ATTRS
+    LD DE,MENU_LOGO_ATTRS_TOP
     CALL RESTORE_ATTR_1_2
     POP DE
     CALL DRAW_1_2
@@ -169,7 +169,7 @@ MENU_DRAW_16X16:
     INC B
     PUSH DE
     CALL GET_SCREEN_ADDR
-    LD DE,MENU_LOGO_ATTRS
+    LD DE,MENU_LOGO_ATTRS_BOTTOM
     CALL RESTORE_ATTR_1_2
     POP DE
     JP DRAW_1_2
@@ -369,7 +369,8 @@ RESTORE_PAUSE_AREA:
     RET
 
 MENU_TEXT_ATTR:    DB #47
-MENU_LOGO_ATTRS:   DB #44,#44
+MENU_LOGO_ATTRS_TOP:    DB #47,#47  ; bright white top band
+MENU_LOGO_ATTRS_BOTTOM: DB #45,#45  ; bright cyan shadow band
 MENU_LOGO_CURSOR:  DW 0
 MENU_LOGO_X:       DB 8
 MENU_LOGO_LEFT:    DB 8
@@ -399,110 +400,114 @@ MENU_LOGO_POINTERS:
     DW MENU_GLYPH_S,MENU_GLYPH_P,MENU_GLYPH_A,MENU_GLYPH_C
     DW MENU_GLYPH_E,MENU_GLYPH_C,MENU_GLYPH_A,MENU_GLYPH_N
 
+; Pixel-exact Variant #1 from spacecan_variant_1.bin.
+; Each glyph is 16x16 pixels (32 bytes), split into two ZX ink
+; bands: bright white (#47) above, bright cyan (#45) below.
+; Dithered holes give a half-tone shadow without attribute clash.
 MENU_GLYPH_S:
     DB #00,#00
-    DB #07,#E0
-    DB #07,#E0
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #07,#E0
-    DB #07,#E0
-    DB #00,#18
-    DB #00,#18
-    DB #00,#18
-    DB #00,#18
-    DB #1F,#E0
-    DB #1F,#E0
+    DB #0F,#F8
+    DB #3F,#FC
+    DB #7F,#FC
+    DB #78,#00
+    DB #78,#00
+    DB #7F,#80
+    DB #3B,#B8
+    DB #07,#74
+    DB #00,#EE
+    DB #00,#1C
+    DB #20,#3A
+    DB #7F,#FE
+    DB #7F,#FC
+    DB #1F,#F0
     DB #00,#00
 
 MENU_GLYPH_P:
     DB #00,#00
-    DB #1F,#E0
-    DB #1F,#E0
-    DB #18,#18
-    DB #18,#18
-    DB #18,#18
-    DB #18,#18
-    DB #1F,#E0
-    DB #1F,#E0
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
+    DB #7F,#F0
+    DB #7F,#FC
+    DB #7F,#FC
+    DB #7C,#3E
+    DB #7C,#1E
+    DB #7C,#3E
+    DB #3B,#BA
+    DB #77,#74
+    DB #6E,#E0
+    DB #5C,#00
+    DB #38,#00
+    DB #7C,#00
+    DB #7C,#00
+    DB #7C,#00
     DB #00,#00
 
 MENU_GLYPH_A:
     DB #00,#00
+    DB #03,#C0
+    DB #07,#C0
     DB #07,#E0
     DB #07,#E0
-    DB #18,#18
-    DB #18,#18
-    DB #18,#18
-    DB #18,#18
-    DB #1F,#F8
-    DB #1F,#F8
-    DB #18,#18
-    DB #18,#18
-    DB #18,#18
-    DB #18,#18
-    DB #18,#18
-    DB #18,#18
+    DB #0F,#E0
+    DB #0E,#70
+    DB #0A,#30
+    DB #16,#70
+    DB #0C,#68
+    DB #1D,#D8
+    DB #3B,#B8
+    DB #3D,#BC
+    DB #38,#1C
+    DB #78,#1E
     DB #00,#00
 
 MENU_GLYPH_C:
     DB #00,#00
-    DB #07,#F8
-    DB #07,#F8
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #07,#F8
-    DB #07,#F8
+    DB #03,#F8
+    DB #0F,#FE
+    DB #1F,#FE
+    DB #3E,#02
+    DB #7C,#00
+    DB #7C,#00
+    DB #38,#00
+    DB #74,#00
+    DB #6C,#00
+    DB #5C,#00
+    DB #3A,#02
+    DB #1F,#FE
+    DB #0F,#FE
+    DB #03,#F8
     DB #00,#00
 
 MENU_GLYPH_E:
     DB #00,#00
-    DB #1F,#F8
-    DB #1F,#F8
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #1F,#E0
-    DB #1F,#E0
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #18,#00
-    DB #1F,#F8
-    DB #1F,#F8
+    DB #7F,#FC
+    DB #7F,#FC
+    DB #7F,#FC
+    DB #7C,#00
+    DB #7C,#00
+    DB #7F,#FC
+    DB #3B,#B8
+    DB #77,#74
+    DB #6C,#00
+    DB #5C,#00
+    DB #38,#00
+    DB #7F,#FE
+    DB #7F,#FE
+    DB #7F,#FE
     DB #00,#00
 
 MENU_GLYPH_N:
     DB #00,#00
-    DB #18,#18
-    DB #18,#18
-    DB #1E,#18
-    DB #1E,#18
-    DB #19,#98
-    DB #19,#98
-    DB #18,#78
-    DB #18,#78
-    DB #18,#18
-    DB #18,#18
-    DB #18,#18
-    DB #18,#18
-    DB #18,#18
-    DB #18,#18
+    DB #7C,#1E
+    DB #7E,#1E
+    DB #7E,#1E
+    DB #7F,#1E
+    DB #7F,#1E
+    DB #7F,#9E
+    DB #3B,#9A
+    DB #71,#56
+    DB #68,#EE
+    DB #58,#DC
+    DB #38,#BA
+    DB #78,#7E
+    DB #78,#3E
+    DB #78,#3E
     DB #00,#00
