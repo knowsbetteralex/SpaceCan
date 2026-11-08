@@ -193,10 +193,10 @@ START_ENEMY_BLAST:
     LD A,1
     LD (BLAST_ACTIVE),A
     LD (BLAST_DIRTY),A
-    IFN DEBUG_BORDER
-        LD A,2
-        OUT (#FE),A
-    ENDIF
+    ;IFN DEBUG_BORDER
+    ;    LD A,2
+    ;    OUT (#FE),A
+    ;ENDIF
     RET
 
 ; Dedicated ship explosion replaces any asteroid blast. Its last
