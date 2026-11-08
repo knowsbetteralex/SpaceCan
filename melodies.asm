@@ -1,73 +1,154 @@
 ; -------------------------------------------------------------
-; SpaceCan Step 14: original beeper title/end tunes and pause cue.
+; SpaceCan Step 15: BPM-aware beeper melodies, 16-bit note lengths.
 ;
-; MELODY_PLAY: HL -> [half-period, cycles] pairs, terminated by 0,0.
-; This is a foreground player used ONLY in menu/gameover/pause, never
-; during active gameplay. Its DI tone loop is intentionally blocking
-; and avoids ROM interrupt jitter, with one 50Hz silent gap per note.
+; Melody source is written in musical note values, not raw periods:
+;    MELODY_NOTE NOTE_E5, DUR_EIGHTH, PAUSE_BPM
+;    MELODY_REST DUR_SIXTEENTH, PAUSE_BPM
+;    MELODY_END
 ;
-; On a 3.5 MHz Z80 each pulse is approximately 41+32*period T:
-;   E5=165 (~658 Hz), C5=208 (~523 Hz), etc.
-; Each note's cycle count is 1..255, giving independent durations.
-; EAR bit 4 toggles; port shadow SFX_FE_BASE preserves border/MIC.
-; In: HL tune pointer. Out: none. Destroys AF,BC,DE,HL.
-; Preserves IX; enters/exits with interrupts enabled on 48K IM1.
+; Encoded stream (3 bytes per event):
+;   pitch, count_lo, count_hi
+;   pitch 1..255 = note; count is 16-bit square-wave cycles.
+;   pitch 0 + nonzero count = silence in 50Hz interrupt frames.
+;   pitch 0 + zero count = end of tune.
+;
+; Tempo and duration symbols are compile-time: change *_BPM and
+; reassemble. This keeps the run-time 48K player small and readable.
+; 24 units per quarter note: represents ordinary notes, dotted
+; notes, and standard triplets without fractional arithmetic.
 ; -------------------------------------------------------------
 
+MELODY_CPU_HZ      EQU 3500000
+MELODY_FRAME_HZ    EQU 50
+MELODY_UNITS_BEAT  EQU 24
+MELODY_GAP_FRAMES  EQU 1       ; a real 20ms silence after each note
+
+DUR_WHOLE          EQU 96
+DUR_HALF           EQU 48
+DUR_QUARTER        EQU 24
+DUR_EIGHTH         EQU 12
+DUR_SIXTEENTH      EQU 6
+DUR_THIRTYSECOND   EQU 3
+
+DUR_HALF_DOT       EQU 72
+DUR_QUARTER_DOT    EQU 36
+DUR_EIGHTH_DOT     EQU 18
+DUR_SIXTEENTH_DOT  EQU 9
+
+DUR_HALF_TRIPLET      EQU 32
+DUR_QUARTER_TRIPLET   EQU 16
+DUR_EIGHTH_TRIPLET    EQU 8
+DUR_SIXTEENTH_TRIPLET EQU 4
+
+; One square-wave cycle is approximately 54 + 32*pitch T-states.
+; Divide clock by the per-cycle cost FIRST to avoid overflow of
+; 32-bit assembler arithmetic, then multiply by musical duration.
+; Note encoding uses a 16-bit cycle count, so long notes no longer
+; suffer the former 255-cycle limit.
+MACRO MELODY_NOTE pitch, duration, tempo
+    DB pitch
+    DW ((MELODY_CPU_HZ / (54 + 32*(pitch))) * 60 * (duration) + ((tempo)*MELODY_UNITS_BEAT/2)) / ((tempo)*MELODY_UNITS_BEAT)
+ENDM
+
+; A rest is counted in whole 50Hz frames; timing precision is 20ms.
+MACRO MELODY_REST duration, tempo
+    DB 0
+    DW (MELODY_FRAME_HZ * 60 * (duration) + ((tempo)*MELODY_UNITS_BEAT/2)) / ((tempo)*MELODY_UNITS_BEAT)
+ENDM
+
+MACRO MELODY_END
+    DB 0,0,0
+ENDM
+
+; IN HL = 3-byte melody stream. OUT no defined registers.
+; Preserves IX. Uses foreground beeper only outside active play:
+; title, Game Over, or after the game state is set to PAUSED.
+; Tone generation is DI-blocking, rests/gaps use 50Hz IM1 HALT.
 MELODY_PLAY:
     PUSH IX
     PUSH HL
-    POP IX                        ; tune pointer stays in IX
+    POP IX                        ; IX tracks the current event
     DI
-.NEXT_NOTE:
-    LD C,(IX+0)                  ; half-cycle delay, 0 = end
+.NEXT_EVENT:
+    LD C,(IX+0)                  ; tone half-period (0 = rest/end)
+    LD E,(IX+1)                  ; 16-bit cycle count / rest frames
+    LD D,(IX+2)
+    INC IX
+    INC IX
+    INC IX
     LD A,C
     OR A
-    JR Z,.DONE
-    LD B,(IX+1)                  ; number of complete square-wave cycles
-    INC IX
-    INC IX
+    JR NZ,.NOTE
+    LD A,D
+    OR E
+    JR Z,.END                    ; 0,0,0 = end of melody
+    CALL MELODY_WAIT_FRAMES      ; explicit rest, no extra note gap
+    JR .NEXT_EVENT
+.NOTE:
+    LD A,D
+    OR E
+    JR Z,.NEXT_EVENT             ; a zero-length note is ignored
     CALL MELODY_TONE
-    ; One 50Hz silent tick makes neighboring notes distinct.
-    ; This is safe only in menu, Game Over or frozen PAUSED state.
-    EI
-    HALT
-    DI
-    JR .NEXT_NOTE
-.DONE:
+    LD DE,MELODY_GAP_FRAMES
+    CALL MELODY_WAIT_FRAMES
+    JR .NEXT_EVENT
+.END:
     LD A,(SFX_FE_BASE)
-    AND #0F
-    OUT (#FE),A                   ; EAR low, same colour as gameplay
+    AND #0F                       ; EAR low; keep border and MIC
+    OUT (#FE),A
     EI
     POP IX
     RET
 
-; IN B=pulses (nonzero), C=half-period delay.
-; Output square wave with accurate enough pitch for short melodies.
-; Interrupted drawing is safe: this is called ONLY in non-play states.
+; IN: C = pitch delay, DE = complete square-wave cycles (1..65535).
+; Out: DE=0; destroys AF,HL. Preserves BC and IX.
+; One loop is ~54+32*C T-states. Interrupts must be disabled.
 MELODY_TONE:
     LD A,(SFX_FE_BASE)
     AND #0F
-    LD D,A                        ; low EAR, preserve border and MIC
+    LD H,A                        ; EAR low
     OR #10
-    LD E,A                        ; high EAR, preserve border and MIC
+    LD L,A                        ; EAR high
 .CYCLE:
-    LD A,E
+    LD A,L
     OUT (#FE),A
     LD A,C
 .HIGH:
     DEC A
     JR NZ,.HIGH
-    LD A,D
+    LD A,H
     OUT (#FE),A
     LD A,C
 .LOW:
     DEC A
     JR NZ,.LOW
-    DJNZ .CYCLE
+    DEC DE                        ; 16-bit duration, no wrap
+    LD A,D
+    OR E
+    JR NZ,.CYCLE
+    RET                            ; last write already left EAR low
+
+; IN DE=number of 50Hz frames (1..65535), entry/exit with DI.
+; First HALT synchronizes to IM1; the following HALTs consume full
+; frame periods. No audible square wave is produced during a rest.
+MELODY_WAIT_FRAMES:
+    LD A,(SFX_FE_BASE)
+    AND #0F
+    OUT (#FE),A
+    EI
+    HALT                           ; align with a frame interrupt
+.NEXT_FRAME:
+    HALT
+    DEC DE
+    LD A,D
+    OR E
+    JR NZ,.NEXT_FRAME
+    DI
     RET
 
-; Calculated for 3.5 MHz Spectrum, 41+32*N T per cycle.
+; Existing tone periods (8-bit), tuned for 3.5MHz and the loop above.
+NOTE_A4 EQU 247
+NOTE_B4 EQU 219
 NOTE_C5 EQU 208
 NOTE_D5 EQU 185
 NOTE_E5 EQU 165
@@ -78,35 +159,41 @@ NOTE_B5 EQU 109
 NOTE_C6 EQU 103
 NOTE_D6 EQU 92
 
-; Four supplied notes: E5 - C5 - E5 - C5 held.
-; A short pause-like signal, without copying full game music.
+; Song tempos are measured in quarter notes per minute.
+PAUSE_BPM      EQU 160
+TITLE_BPM      EQU 160
+GAME_OVER_BPM  EQU 150
+
+; Pause: E - C - E - C held, with the last C one full quarter.
+; At 160 BPM the first three notes are each ~93.75ms, last ~375ms.
 MELODY_PAUSE:
-    DB NOTE_E5,58                 ; ~88 ms
-    DB NOTE_C5,45                 ; ~86 ms
-    DB NOTE_E5,58                 ; ~88 ms
-    DB NOTE_C5,200                ; ~383 ms
-    DB 0,0
+    MELODY_NOTE NOTE_E5, DUR_SIXTEENTH, PAUSE_BPM
+    MELODY_NOTE NOTE_C5, DUR_SIXTEENTH, PAUSE_BPM
+    MELODY_NOTE NOTE_E5, DUR_SIXTEENTH, PAUSE_BPM
+    MELODY_NOTE NOTE_C5, DUR_QUARTER, PAUSE_BPM
+    MELODY_END
 
-; Original, ascending cosmic fanfare for title screen.
+; Original nine-note rising SpaceCan title fanfare.
 MELODY_TITLE:
-    DB NOTE_C5,44
-    DB NOTE_E5,58
-    DB NOTE_G5,70
-    DB NOTE_C6,120
-    DB NOTE_D6,85
-    DB NOTE_C6,100
-    DB NOTE_G5,100
-    DB NOTE_E5,100
-    DB NOTE_C6,180
-    DB 0,0
+    MELODY_NOTE NOTE_C5, DUR_SIXTEENTH, TITLE_BPM
+    MELODY_NOTE NOTE_E5, DUR_SIXTEENTH, TITLE_BPM
+    MELODY_NOTE NOTE_G5, DUR_SIXTEENTH, TITLE_BPM
+    MELODY_NOTE NOTE_C6, DUR_EIGHTH, TITLE_BPM
+    MELODY_NOTE NOTE_D6, DUR_SIXTEENTH, TITLE_BPM
+    MELODY_NOTE NOTE_C6, DUR_SIXTEENTH, TITLE_BPM
+    MELODY_NOTE NOTE_G5, DUR_EIGHTH, TITLE_BPM
+    MELODY_NOTE NOTE_E5, DUR_SIXTEENTH, TITLE_BPM
+    MELODY_REST DUR_SIXTEENTH, TITLE_BPM
+    MELODY_NOTE NOTE_C6, DUR_EIGHTH_DOT, TITLE_BPM
+    MELODY_END
 
-; Original descending Game Over theme (separate from game SFX).
+; Original seven-note downward Game Over ending.
 MELODY_GAME_OVER:
-    DB NOTE_C6,85
-    DB NOTE_B5,90
-    DB NOTE_A5,78
-    DB NOTE_G5,90
-    DB NOTE_E5,110
-    DB NOTE_D5,110
-    DB NOTE_C5,190
-    DB 0,0
+    MELODY_NOTE NOTE_C6, DUR_SIXTEENTH, GAME_OVER_BPM
+    MELODY_NOTE NOTE_B5, DUR_SIXTEENTH, GAME_OVER_BPM
+    MELODY_NOTE NOTE_A5, DUR_SIXTEENTH, GAME_OVER_BPM
+    MELODY_NOTE NOTE_G5, DUR_SIXTEENTH, GAME_OVER_BPM
+    MELODY_NOTE NOTE_E5, DUR_EIGHTH, GAME_OVER_BPM
+    MELODY_NOTE NOTE_D5, DUR_EIGHTH, GAME_OVER_BPM
+    MELODY_NOTE NOTE_C5, DUR_QUARTER, GAME_OVER_BPM
+    MELODY_END

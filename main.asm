@@ -1,4 +1,4 @@
-; SpaceCan Step 14: beeper title, pause and Game Over jingles.
+; SpaceCan Step 15: BPM notation and 16-bit beeper note durations.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
