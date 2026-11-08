@@ -1,5 +1,5 @@
-; ===== SpaceCan Step 12.2, all INCLUDE files expanded =====
-; SpaceCan Step 12: six-digit score, four heart lives, gentler speed stages.
+; ===== SpaceCan Step 13: all INCLUDE files expanded =====
+; SpaceCan Step 13: frame-sliced beeper SFX; AY music follows later.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -64,11 +64,11 @@ E_PHASE        EQU 12          ; initial animation timer
 ; Border phase diagnostics for ZX Spectrum 48K.
 ;
 ; Set DEBUG_BORDER=0 for a normal game build (no phase code emitted).
-; Current beeper driver is not installed yet. When enabling beeper
-; sound, use a shared #FE output routine to preserve MIC/EAR bits.
+; Phase writes must update SFX_FE_BASE before touching port #FE
+; so sound pulses preserve border colour and MIC state.
 ; -------------------------------------------------------------
 
-DEBUG_BORDER EQU 1
+DEBUG_BORDER EQU 0
 
 DBG_RENDER_COLOUR EQU 2  ; red: sprites/background
 DBG_HUD_COLOUR    EQU 6  ; yellow: HUD
@@ -79,6 +79,7 @@ DBG_IDLE_COLOUR   EQU 1  ; blue: remainder of frame / HALT
 MACRO DEBUG_PHASE colour
     IF DEBUG_BORDER
         LD A,colour
+        LD (SFX_FE_BASE),A
         OUT (#FE),A
     ENDIF
 ENDM
@@ -97,6 +98,9 @@ B_DRAW_HALF EQU 8  ; 4px offset of last drawn picture
 
 START:
     DI
+    LD A,1
+    LD (SFX_FE_BASE),A            ; border/MIC shadow for beeper pulses
+    OUT (#FE),A
     IM 1                         ; 48K ROM interrupt handler
     EI
     JP SHOW_START_MENU
@@ -104,6 +108,7 @@ START:
 ; New game (from menu or after Game Over):
 ; only here are score, speed and lives reset.
 START_NEW_GAME:
+    CALL SFX_STOP                 ; silence any earlier effect
     XOR A
     LD (SCORE),A
     LD (SCORE+1),A
@@ -121,6 +126,7 @@ START_NEW_GAME:
 ; Each new ship starts without pressure, preserving score/speed/lives.
 RESTART_ROUND:
     DI
+    CALL SFX_STOP                 ; each new life starts silent
     ; Pressure is local to ONE life, regardless of how it was lost.
     ; Also reset the partial 3-screen distance on every respawn.
     XOR A
@@ -160,11 +166,13 @@ MAIN_LOOP:
     CALL READ_INPUT
     DEBUG_PHASE DBG_LOGIC_COLOUR
     CALL UPDATE_GAME
-    JR .FRAME_END
+    JR .FRAME_SOUND
 .EXPLODING:
     ; The only moving item during this mode is the ship explosion.
     DEBUG_PHASE DBG_LOGIC_COLOUR
     CALL UPDATE_BLAST_ANIM
+.FRAME_SOUND:
+    CALL SFX_TICK                  ; bounded short pulse; skip on PAUSED
 .FRAME_END:
     DEBUG_PHASE DBG_IDLE_COLOUR
     JR MAIN_LOOP
@@ -185,6 +193,7 @@ SHOW_START_MENU:
     LD A,STATE_MENU
     LD (GAME_STATE),A
     DI
+    CALL SFX_STOP
     CALL LOAD_SPACE_CAN_SCREEN
     CALL DRAW_MENU_LOGO
     LD A,#46                       ; bright yellow title and subtitle
@@ -228,6 +237,7 @@ SHOW_GAME_OVER:
     LD A,STATE_GAME_OVER
     LD (GAME_STATE),A
     DI
+    CALL SFX_STOP
     CALL DRAW_STATIC_UI
     LD A,1
     LD (HUD_DIRTY),A
@@ -684,6 +694,155 @@ MENU_GLYPH_N:
     DB #78,#3E
     DB #00,#00
 
+; ===== sfx.asm =====
+; -------------------------------------------------------------
+; SpaceCan Step 13 — frame-sliced beeper effects on ZX port #FE.
+; No AY access here: three AY voices remain free for future music.
+;
+; SFX_START: A=1..5. Clobbers AF,DE,HL, preserves BC/IX.
+; SFX_TICK:  one bounded burst/frame; clobbers AF,BC,DE,HL.
+; SFX_STOP:  silence immediately, preserving border (clobbers AF).
+; Priority: SHIP > PENALTY > KILL > HIT > SHOT.
+; Only called from mainline, never from IM1 ISR.
+; Port #FE lower bits: BORDER (0..2), MIC (3), EAR (4).
+; -------------------------------------------------------------
+SFX_SHOT    EQU 1
+SFX_HIT     EQU 2
+SFX_KILL    EQU 3
+SFX_PENALTY EQU 4
+SFX_SHIP    EQU 5
+
+; Start/replace a sound only if it is not lower priority.
+SFX_START:
+    LD HL,SFX_ACTIVE
+    CP (HL)
+    RET C
+    LD (HL),A
+    DEC A
+    LD E,A
+    ADD A,A
+    ADD A,E                       ; three bytes per preset
+    LD E,A
+    LD D,0
+    LD HL,SFX_PRESETS
+    ADD HL,DE
+    LD A,(HL)
+    LD (SFX_FRAMES),A
+    INC HL
+    LD A,(HL)
+    LD (SFX_PERIOD),A
+    INC HL
+    LD A,(HL)
+    LD (SFX_SWEEP),A
+    RET
+
+; EAR low, even if stopping during pause, restart or Game Over.
+SFX_STOP:
+    XOR A
+    LD (SFX_ACTIVE),A
+    LD (SFX_FRAMES),A
+    LD A,(SFX_FE_BASE)
+    AND #0F
+    OUT (#FE),A
+    RET
+
+; One small pulse packet at the end of a game frame.
+; Bound: C<=19 => 8 pulses, 20<=C<40 => 4, >=40 => 2.
+; At 3.5MHz: <~1.8ms worst case including management overhead.
+SFX_TICK:
+    LD A,(SFX_ACTIVE)
+    OR A
+    RET Z
+
+    ; Halfway through penalty effect, restart pitch for second chirp.
+    CP SFX_PENALTY
+    JR NZ,.PREPARE
+    LD A,(SFX_FRAMES)
+    CP 4
+    JR NZ,.PREPARE
+    LD A,12
+    LD (SFX_PERIOD),A
+.PREPARE:
+    LD A,(SFX_PERIOD)
+    LD C,A
+    LD A,(SFX_ACTIVE)
+    CP SFX_KILL
+    JR Z,.NOISE
+    CP SFX_SHIP
+    JR NZ,.SELECT_PULSES
+.NOISE:
+    ; Low-cost LFSR pitch jitter, only for destructive effects.
+    LD A,(SFX_NOISE)
+    SRL A
+    JR NC,.NO_XOR
+    XOR #B8
+.NO_XOR:
+    LD (SFX_NOISE),A
+    AND 7
+    ADD A,C
+    LD C,A
+.SELECT_PULSES:
+    LD A,C
+    CP 20
+    LD B,8
+    JR C,.PORT
+    LD B,4
+    CP 40
+    JR C,.PORT
+    LD B,2
+.PORT:
+    LD A,(SFX_FE_BASE)
+    AND #0F                       ; keep border and MIC, EAR cleared
+    LD D,A
+    OR #10
+    LD E,A
+.PULSE:
+    LD A,E
+    OUT (#FE),A                    ; high
+    LD A,C
+.HIGH_WAIT:
+    DEC A
+    JR NZ,.HIGH_WAIT
+    LD A,D
+    OUT (#FE),A                    ; low
+    LD A,C
+.LOW_WAIT:
+    DEC A
+    JR NZ,.LOW_WAIT
+    DJNZ .PULSE                   ; EAR always low between frames
+
+    LD HL,SFX_FRAMES
+    DEC (HL)
+    JR Z,.DONE
+    LD A,(SFX_PERIOD)
+    LD HL,SFX_SWEEP
+    ADD A,(HL)
+    CP 65
+    JR C,.STORE_PERIOD
+    LD A,64                        ; cap base period, no 8-bit wrap
+.STORE_PERIOD:
+    LD (SFX_PERIOD),A
+    RET
+.DONE:
+    XOR A
+    LD (SFX_ACTIVE),A
+    RET
+
+; One preset = duration (50Hz frames), period, per-frame sweep.
+SFX_PRESETS:
+    DB 4,11,5                      ; laser shot
+    DB 3,7,8                       ; hard hit
+    DB 9,19,5                      ; noisy asteroid destruction
+    DB 8,14,2                      ; two-part alarm
+    DB 30,12,2                     ; long, low ship explosion
+
+SFX_ACTIVE:  DB 0
+SFX_FRAMES:  DB 0
+SFX_PERIOD:  DB 0
+SFX_SWEEP:   DB 0
+SFX_NOISE:   DB #A5
+SFX_FE_BASE: DB 1                  ; shadow: border/MIC only, no EAR
+
 ; ===== logic.asm =====
 ; -------------------------------------------------------------
 ; INPUT: controls prepare positions only. No drawing here.
@@ -880,16 +1039,18 @@ START_ENEMY_BLAST:
     LD A,1
     LD (BLAST_ACTIVE),A
     LD (BLAST_DIRTY),A
-    IFN DEBUG_BORDER
-        LD A,2
-        OUT (#FE),A
-    ENDIF
+    ;IFN DEBUG_BORDER
+    ;    LD A,2
+    ;    OUT (#FE),A
+    ;ENDIF
     RET
 
 ; Dedicated ship explosion replaces any asteroid blast. Its last
 ; drawn image is marked for erasure BEFORE BLAST_POS is replaced.
 ; The renderer then erases the ship and paints explosion frame zero.
 START_SHIP_EXPLOSION:
+    LD A,SFX_SHIP              ; highest priority: new ship explosion
+    CALL SFX_START
     LD A,(BLAST_DRAWN)
     OR A
     JR Z,.OLD_GONE
@@ -1090,6 +1251,8 @@ UPDATE_MISS_PRESSURE:
     INC (HL)                      ; once red, segments never turn green
     LD A,1
     LD (GAUGE_DIRTY),A
+    LD A,SFX_PENALTY           ; new red segment: double warning chirp
+    CALL SFX_START
     LD A,(PRESSURE_LEVEL)
     CP PRESSURE_SEGMENTS
     RET C
@@ -1154,7 +1317,8 @@ FIRE_BULLET:
     LD (IX+B_DIRTY),A
     LD HL,BULLET_COUNT
     INC (HL)
-    RET
+    LD A,SFX_SHOT
+    JP SFX_START                 ; sound only after successful spawn
 .NEXT_SLOT:
     LD DE,BULLET_SLOT_SIZE
     ADD IX,DE
@@ -1731,6 +1895,8 @@ ON_ENEMY_HIT:
     CALL START_ENEMY_BLAST
     CALL DEACTIVATE_ENEMY
     CALL RESET_MISS_TRAVEL    ; a kill resets only the 3-screen timer
+    LD A,SFX_KILL
+    CALL SFX_START
     LD A,(IX+E_TYPE)
     OR A
     LD A,64
@@ -1739,6 +1905,8 @@ ON_ENEMY_HIT:
 .AWARD:
     JP ADD_SCORE_A
 .DAMAGED:
+    LD A,SFX_HIT                ; damaged large asteroid, not destroyed
+    CALL SFX_START
     LD A,1
     LD (IX+E_DIRTY),A
     RET
@@ -2895,7 +3063,7 @@ DRAW_LIVES_HEARTS:
 .NEXT_HEART:
     PUSH AF
     PUSH BC
-    LD B,2
+    LD B,1
     CALL GET_SCREEN_ADDR
     LD A,(SHIP_LIVES)
     ADD A,14
@@ -3732,28 +3900,28 @@ SPACE_CAN_SCREEN_RLE:
     DB $26,$00,$11,$00,$01,$FE,$F7,$7F,$FF,$FF,$DC,$3B,$FF,$FF,$FE,$EF
     DB $70,$00,$01,$00,$FF,$00,$10,$00,$86,$03,$7E,$F7,$7F,$FF,$FF,$DC
     DB $3D,$F7,$DF,$7B,$EF,$60,$FF,$35,$00,$10,$00,$81,$BB,$7E,$F7,$BE
-    DB $FB,$EF,$BC,$00,$05,$00,$6F,$3F,$05,$00,$10,$00,$81,$F3,$5C,$00
-    DB $0A,$00,$67,$87,$E1,$00,$10,$00,$8B,$02,$7C,$00,$05,$00,$32,$00
+    DB $FB,$EF,$BC,$00,$05,$00,$6F,$3F,$05,$00,$10,$00,$81,$F3,$5E,$00
+    DB $0A,$00,$67,$87,$E1,$00,$10,$00,$8B,$02,$7E,$00,$05,$00,$32,$00
     DB $02,$00,$02,$EC,$67,$8F,$5F,$00,$10,$00,$80,$AB,$BE,$37,$40,$00
     DB $02,$00,$4C,$32,$41,$0A,$12,$EC,$65,$7F,$FF,$00,$10,$00,$AA,$FF
-    DB $FC,$37,$44,$00,$01,$00,$10,$4C,$32,$41,$0A,$12,$EC,$6F,$FF,$FF
-    DB $00,$10,$00,$BF,$FF,$FC,$37,$44,$00,$01,$00,$10,$4C,$1F,$00,$01
-    DB $00,$7F,$C0,$FF,$F3,$07,$E1,$00,$10,$00,$86,$D0,$FC,$7D,$01,$FF
+    DB $FE,$37,$44,$00,$01,$00,$10,$4C,$32,$41,$0A,$12,$EC,$6F,$FF,$FF
+    DB $00,$10,$00,$BF,$FF,$FE,$37,$44,$00,$01,$00,$10,$4C,$1F,$00,$01
+    DB $00,$7F,$C0,$FF,$73,$07,$E1,$00,$10,$00,$86,$D0,$FC,$7D,$01,$FF
     DB $00,$01,$00,$F4,$3B,$FF,$FF,$FE,$EF,$60,$00,$01,$00,$8E,$00,$10
     DB $00,$06,$06,$7E,$F7,$7F,$FF,$FF,$DC,$3D,$F7,$DF,$7B,$EF,$61,$FE
     DB $7E,$00,$10,$00,$03,$BE,$3E,$F7,$BE,$FB,$EF,$BC,$00,$05,$00,$60
-    DB $7E,$08,$00,$10,$00,$03,$F2,$7C,$00,$05,$00,$3F,$00,$04,$FF,$63
+    DB $7E,$08,$00,$10,$00,$03,$F2,$7E,$00,$05,$00,$3F,$00,$04,$FF,$63
     DB $0F,$CC,$00,$10,$00,$1E,$0F,$FE,$00,$04,$FF,$FC,$32,$6A,$AA,$82
-    DB $EC,$6F,$8B,$FC,$00,$11,$00,$AA,$FC,$B7,$4A,$29,$A4,$4C,$32,$62
+    DB $EC,$6F,$8B,$FC,$00,$11,$00,$AA,$FE,$B7,$4A,$29,$A4,$4C,$32,$62
     DB $85,$22,$EC,$60,$3F,$FE,$00,$11,$00,$7F,$FE,$B7,$4A,$2A,$22,$4C
-    DB $32,$62,$85,$22,$EC,$6F,$FF,$FC,$00,$10,$00,$2F,$FF,$F8,$B7,$4A
+    DB $32,$62,$85,$22,$EC,$6F,$FF,$FC,$00,$10,$00,$2F,$FF,$FA,$B7,$4A
     DB $2A,$22,$4C,$2E,$05,$FF,$F0,$FE,$7B,$3F,$FE,$00,$10,$00,$7F,$80
     DB $FC,$3B,$2F,$FF,$C0,$BE,$38,$00,$03,$00,$EF,$60,$00,$01,$00,$44
     DB $00,$10,$00,$0F,$07,$5E,$F7,$00,$03,$00,$1C,$3D,$F7,$DF,$7B,$EF
     DB $63,$FD,$E6,$00,$10,$00,$03,$76,$3E,$F7,$BE,$FB,$EF,$BC,$7F,$00
-    DB $04,$FF,$60,$3C,$04,$00,$10,$00,$03,$60,$FC,$00,$04,$FF,$FE,$3F
-    DB $00,$04,$FF,$63,$1F,$00,$11,$00,$06,$06,$7C,$00,$04,$FF,$FC,$32
-    DB $85,$55,$42,$ED,$7F,$10,$5C,$00,$11,$00,$01,$74,$37,$44,$10,$08
+    DB $04,$FF,$60,$3C,$04,$00,$10,$00,$03,$60,$FE,$00,$04,$FF,$FE,$3F
+    DB $00,$04,$FF,$63,$1F,$00,$11,$00,$06,$06,$7E,$00,$04,$FF,$FC,$32
+    DB $85,$55,$42,$ED,$7F,$10,$5C,$00,$11,$00,$01,$76,$37,$44,$10,$08
     DB $4C,$32,$A0,$00,$01,$00,$52,$ED,$60,$7F,$FE,$00,$10,$00,$2B,$7F
     DB $FE,$B7,$44,$15,$00,$01,$00,$4C,$32,$A0,$00,$01,$00,$52,$ED,$67
     DB $FF,$FE,$00,$10,$00,$1F,$FF,$F6,$B7,$44,$15,$00,$01,$00,$4C,$35
@@ -3761,40 +3929,40 @@ SPACE_CAN_SCREEN_RLE:
     DB $03,$FF,$00,$01,$00,$F4,$3D,$F7,$DF,$7B,$EF,$60,$00,$01,$00,$FE
     DB $00,$10,$00,$06,$0F,$DE,$F7,$BE,$FB,$EF,$BC,$3D,$F7,$DF,$7B,$EF
     DB $67,$E7,$CE,$00,$10,$00,$06,$7D,$FE,$F7,$BE,$FB,$EF,$BC,$3F,$00
-    DB $04,$FF,$60,$00,$01,$00,$0A,$00,$10,$00,$06,$E0,$FC,$00,$04,$FF
-    DB $FC,$30,$00,$03,$00,$E0,$60,$7E,$D4,$00,$10,$00,$0C,$02,$FC,$FF
+    DB $04,$FF,$60,$00,$01,$00,$0A,$00,$10,$00,$06,$E0,$FE,$00,$04,$FF
+    DB $FC,$30,$00,$03,$00,$E0,$60,$7E,$D4,$00,$10,$00,$0C,$02,$FE,$FF
     DB $00,$03,$00,$0C,$32,$46,$AA,$92,$EC,$7E,$3F,$FE,$00,$10,$00,$02
     DB $AF,$FE,$B7,$4A,$28,$24,$4C,$32,$42,$B2,$92,$EC,$6F,$FF,$FE,$00
-    DB $10,$00,$2A,$FF,$FC,$37,$4A,$2A,$84,$4C,$32,$42,$B2,$92,$EC,$70
+    DB $10,$00,$2A,$FF,$FE,$37,$4A,$2A,$84,$4C,$32,$42,$B2,$92,$EC,$70
     DB $FF,$FE,$00,$10,$00,$3F,$FF,$8E,$B7,$4A,$2A,$84,$4C,$3F,$06,$FF
     DB $FC,$FF,$3F,$BF,$FE,$00,$10,$00,$7F,$FB,$F8,$3F,$3F,$FF,$E0,$FC
     DB $3D,$F7,$DF,$7B,$EF,$60,$38,$15,$00,$10,$00,$84,$0F,$DE,$F7,$BE
     DB $FB,$EF,$BC,$3D,$F7,$DF,$7B,$EF,$6D,$9F,$9F,$00,$10,$00,$84,$7D
     DB $BE,$F7,$BE,$FB,$EF,$BC,$00,$05,$00,$60,$00,$01,$00,$01,$00,$10
     DB $00,$86,$C0,$FE,$00,$05,$00,$30,$00,$03,$00,$E0,$60,$FC,$01,$00
-    DB $10,$00,$8C,$02,$7C,$07,$00,$03,$00,$0C,$32,$61,$01,$12,$ED,$7C
-    DB $01,$77,$00,$10,$00,$80,$0D,$7C,$37,$45,$10,$00,$01,$00,$4C,$32
+    DB $10,$00,$8C,$02,$7E,$07,$00,$03,$00,$0C,$32,$61,$01,$12,$ED,$7C
+    DB $01,$77,$00,$10,$00,$80,$0D,$7E,$37,$45,$10,$00,$01,$00,$4C,$32
     DB $00,$02,$00,$22,$ED,$60,$7F,$FD,$00,$10,$00,$81,$7F,$FE,$B7,$44
     DB $15,$00,$01,$00,$4C,$32,$00,$02,$00,$22,$ED,$78,$3F,$A3,$00,$10
-    DB $00,$85,$3C,$3C,$B7,$44,$15,$00,$01,$00,$4C,$3F,$00,$01,$00,$3F
+    DB $00,$85,$3C,$3E,$B7,$44,$15,$00,$01,$00,$4C,$3F,$00,$01,$00,$3F
     DB $D0,$7A,$0F,$DB,$F5,$00,$10,$00,$AB,$EB,$F0,$7B,$01,$FF,$00,$01
     DB $00,$AC,$3D,$F7,$DF,$7B,$EF,$60,$7E,$0E,$00,$11,$00,$1F,$BE,$F7
     DB $BE,$FB,$EF,$BC,$3D,$F7,$DF,$7B,$EF,$6C,$7C,$0C,$00,$11,$00,$8B
     DB $7E,$F7,$BE,$FB,$EF,$BC,$3F,$00,$04,$FF,$60,$00,$01,$00,$1E,$00
-    DB $10,$00,$07,$80,$FC,$00,$04,$FF,$FC,$33,$FF,$FF,$FE,$EF,$61,$F8
+    DB $10,$00,$07,$80,$FE,$00,$04,$FF,$FC,$33,$FF,$FF,$FE,$EF,$61,$F8
     DB $00,$11,$00,$08,$00,$01,$00,$7E,$F7,$7F,$FF,$FF,$CC,$32,$20,$90
     DB $92,$EC,$78,$FF,$FE,$00,$10,$00,$0A,$AF,$FE,$B7,$4A,$80,$AA,$4C
     DB $32,$2A,$2A,$42,$ED,$6B,$FF,$FE,$00,$10,$00,$2F,$FF,$FE,$B7,$4A
-    DB $20,$2A,$4C,$00,$05,$00,$6F,$C0,$00,$12,$00,$03,$F8,$00,$05,$00
+    DB $20,$2A,$4C,$00,$05,$00,$6F,$C0,$00,$12,$00,$03,$FA,$00,$05,$00
     DB $3E,$03,$FF,$F8,$FE,$04,$00,$14,$00,$20,$EF,$1F,$FF,$E0,$FC,$3D
     DB $F7,$DF,$7B,$EF,$60,$FF,$F4,$00,$11,$00,$5F,$BE,$F7,$BE,$FB,$EF
     DB $BC,$3D,$F7,$DF,$7B,$EF,$7D,$F1,$BE,$00,$10,$00,$01,$C3,$7E,$F7
     DB $BE,$FB,$EF,$BC,$3F,$00,$04,$FF,$63,$00,$01,$00,$7E,$00,$10,$00
-    DB $0D,$80,$7C,$00,$04,$FF,$FC,$33,$FF,$FF,$FE,$EF,$61,$E3,$54,$00
-    DB $10,$00,$18,$22,$FC,$F7,$7F,$FF,$FF,$CC,$32,$45,$08,$42,$EC,$70
-    DB $7F,$FE,$00,$10,$00,$0A,$FF,$FC,$37,$4C,$42,$94,$4C,$32,$50,$15
-    DB $12,$EC,$6F,$FF,$FE,$00,$10,$00,$2F,$FF,$FC,$37,$48,$0A,$14,$4C
-    DB $00,$05,$00,$65,$FF,$FE,$00,$10,$00,$7F,$FF,$A0,$00,$05,$00,$3F
+    DB $0D,$80,$7E,$00,$04,$FF,$FC,$33,$FF,$FF,$FE,$EF,$61,$E3,$54,$00
+    DB $10,$00,$18,$22,$FE,$F7,$7F,$FF,$FF,$CC,$32,$45,$08,$42,$EC,$70
+    DB $7F,$FE,$00,$10,$00,$0A,$FF,$FE,$37,$4C,$42,$94,$4C,$32,$50,$15
+    DB $12,$EC,$6F,$FF,$FE,$00,$10,$00,$2F,$FF,$FE,$37,$48,$0A,$14,$4C
+    DB $00,$05,$00,$65,$FF,$FE,$00,$10,$00,$7F,$FF,$A2,$00,$05,$00,$3F
     DB $00,$01,$00,$3F,$C0,$FF,$02,$00,$14,$00,$40,$7F,$01,$FE,$00,$01
     DB $00,$FC,$3D,$F7,$DF,$7B,$EF,$60,$FF,$F6,$00,$11,$00,$FF,$3E,$F7
     DB $BE,$FB,$EF,$BC,$3D,$F7,$DF,$7B,$EF,$7F,$CF,$0E,$00,$10,$00,$01
@@ -3803,7 +3971,7 @@ SPACE_CAN_SCREEN_RLE:
     DB $00,$10,$00,$01,$00,$FE,$37,$40,$00,$02,$00,$4C,$32,$AA,$95,$A2
     DB $ED,$70,$07,$FC,$00,$11,$00,$1F,$FE,$B7,$42,$2D,$4A,$4C,$32,$AA
     DB $2A,$82,$ED,$65,$FF,$FE,$00,$10,$00,$17,$FF,$FE,$B7,$44,$95,$AA
-    DB $4C,$00,$05,$00,$E6,$C0,$00,$12,$00,$03,$63,$00,$05,$00,$3F,$01
+    DB $4C,$00,$05,$00,$66,$C0,$00,$12,$00,$03,$62,$00,$05,$00,$3F,$01
     DB $FF,$F8,$FF,$01,$AA,$AA,$00,$10,$00,$2A,$BA,$80,$FF,$0F,$FF,$C0
     DB $FC,$05,$05,$05,$00,$17,$46,$01,$01,$00,$24,$05,$00,$07,$47,$44
     DB $47,$47,$05,$00,$05,$47,$00,$05,$46,$47,$05,$00,$09,$47,$00,$20
