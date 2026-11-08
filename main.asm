@@ -1,4 +1,4 @@
-; SpaceCan Step 15: BPM notation and 16-bit beeper note durations.
+; SpaceCan Step 15.1: low-noise ship explosion, BPM-aware melodies.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
