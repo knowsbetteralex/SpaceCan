@@ -1,4 +1,4 @@
-; SpaceCan Step 13: frame-sliced beeper SFX; AY music follows later.
+; SpaceCan Step 14: beeper title, pause and Game Over jingles.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -20,7 +20,7 @@ START_LIVES          EQU 4
 MISS_SCREEN_ROWS      EQU PLAYFIELD_BOTTOM-PLAYFIELD_TOP+1
 MISS_DISTANCE_LIMIT   EQU MISS_SCREEN_ROWS*3 ; 3 full corridor heights without kills
 PRESSURE_SEGMENTS     EQU 10    ; 10 penalties fill the gauge and cost a life
-GAME_OVER_FRAMES     EQU 100   ; 2 seconds at the 50Hz ZX interrupt rate
+GAME_OVER_FRAMES     EQU 50    ; ~1 second after the Game Over melody
 SHIP_MOVE_DELAY      EQU 2
 SHIP_BANK_DELAY      EQU 5    ; ticks between 8x8 banking poses
 SHIP_BANK_HOLD       EQU 14   ; keep tilt after releasing O/P
@@ -154,6 +154,7 @@ MAIN_LOOP:
 
     INCLUDE "menu.asm"
     INCLUDE "sfx.asm"
+    INCLUDE "melodies.asm"
     INCLUDE "logic.asm"
     INCLUDE "bullets.asm"
     INCLUDE "enemies.asm"

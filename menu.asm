@@ -49,6 +49,10 @@ SHOW_START_MENU:
     LD A,0
     LD (MENU_PROMPT_MODE),A        ; TO START
     CALL MENU_INIT_PROMPT
+    ; Title is fully drawn before the short original beeper fanfare.
+    ; This may block input for about a second, but never the game loop.
+    LD HL,MELODY_TITLE
+    CALL MELODY_PLAY
     EI
     CALL MENU_WAIT_ANY_KEY
     JP START_NEW_GAME
@@ -81,8 +85,10 @@ SHOW_GAME_OVER:
     LD DE,MENU_BACK_TO_TITLE
     CALL MENU_PRINT_TEXT
 
-    ; 100 frame interrupts = approximately two seconds on 48K.
-    ; Future music can be started before this wait loop.
+    ; Original beeper ending after drawing the score, then a short
+    ; 50Hz hold. The tune runs outside the normal gameplay loop.
+    LD HL,MELODY_GAME_OVER
+    CALL MELODY_PLAY
     EI
     LD B,GAME_OVER_FRAMES
 .HOLD:
@@ -305,7 +311,11 @@ HANDLE_PAUSE_KEY:
     LD (MENU_TEXT_ATTR),A
     LD BC,#0C0D                 ; centered six-character PAUSED
     LD DE,PAUSE_LABEL
-    JP MENU_PRINT_TEXT
+    CALL MENU_PRINT_TEXT
+    ; Only on the ENTER press edge; 4-note E-C-E-C phrase.
+    ; The game is already frozen while the beeper plays the jingle.
+    LD HL,MELODY_PAUSE
+    JP MELODY_PLAY
 .RESUME:
     CALL RESTORE_PAUSE_AREA
     LD A,(PAUSE_PREVIOUS_STATE)
