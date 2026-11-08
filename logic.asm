@@ -203,6 +203,8 @@ START_ENEMY_BLAST:
 ; drawn image is marked for erasure BEFORE BLAST_POS is replaced.
 ; The renderer then erases the ship and paints explosion frame zero.
 START_SHIP_EXPLOSION:
+    LD A,SFX_SHIP              ; highest priority: new ship explosion
+    CALL SFX_START
     LD A,(BLAST_DRAWN)
     OR A
     JR Z,.OLD_GONE
@@ -403,6 +405,8 @@ UPDATE_MISS_PRESSURE:
     INC (HL)                      ; once red, segments never turn green
     LD A,1
     LD (GAUGE_DIRTY),A
+    LD A,SFX_PENALTY           ; new red segment: double warning chirp
+    CALL SFX_START
     LD A,(PRESSURE_LEVEL)
     CP PRESSURE_SEGMENTS
     RET C

@@ -2,8 +2,8 @@
 ; Border phase diagnostics for ZX Spectrum 48K.
 ;
 ; Set DEBUG_BORDER=0 for a normal game build (no phase code emitted).
-; Current beeper driver is not installed yet. When enabling beeper
-; sound, use a shared #FE output routine to preserve MIC/EAR bits.
+; Phase writes must update SFX_FE_BASE before touching port #FE
+; so sound pulses preserve border colour and MIC state.
 ; -------------------------------------------------------------
 
 DEBUG_BORDER EQU 0
@@ -17,6 +17,7 @@ DBG_IDLE_COLOUR   EQU 1  ; blue: remainder of frame / HALT
 MACRO DEBUG_PHASE colour
     IF DEBUG_BORDER
         LD A,colour
+        LD (SFX_FE_BASE),A
         OUT (#FE),A
     ENDIF
 ENDM

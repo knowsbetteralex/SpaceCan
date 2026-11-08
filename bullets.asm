@@ -39,7 +39,8 @@ FIRE_BULLET:
     LD (IX+B_DIRTY),A
     LD HL,BULLET_COUNT
     INC (HL)
-    RET
+    LD A,SFX_SHOT
+    JP SFX_START                 ; sound only after successful spawn
 .NEXT_SLOT:
     LD DE,BULLET_SLOT_SIZE
     ADD IX,DE

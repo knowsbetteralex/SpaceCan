@@ -356,6 +356,8 @@ ON_ENEMY_HIT:
     CALL START_ENEMY_BLAST
     CALL DEACTIVATE_ENEMY
     CALL RESET_MISS_TRAVEL    ; a kill resets only the 3-screen timer
+    LD A,SFX_KILL
+    CALL SFX_START
     LD A,(IX+E_TYPE)
     OR A
     LD A,64
@@ -364,6 +366,8 @@ ON_ENEMY_HIT:
 .AWARD:
     JP ADD_SCORE_A
 .DAMAGED:
+    LD A,SFX_HIT                ; damaged large asteroid, not destroyed
+    CALL SFX_START
     LD A,1
     LD (IX+E_DIRTY),A
     RET

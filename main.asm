@@ -1,4 +1,4 @@
-; SpaceCan Step 12.1: per-life penalty reset, six-digit score and heart lives.
+; SpaceCan Step 13: frame-sliced beeper SFX; AY music follows later.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -74,6 +74,7 @@ B_DRAW_HALF EQU 8  ; 4px offset of last drawn picture
 START:
     DI
     LD A,1
+    LD (SFX_FE_BASE),A            ; border/MIC shadow for beeper pulses
     OUT (#FE),A
     IM 1                         ; 48K ROM interrupt handler
     EI
@@ -82,6 +83,7 @@ START:
 ; New game (from menu or after Game Over):
 ; only here are score, speed and lives reset.
 START_NEW_GAME:
+    CALL SFX_STOP                 ; silence any earlier effect
     XOR A
     LD (SCORE),A
     LD (SCORE+1),A
@@ -99,6 +101,7 @@ START_NEW_GAME:
 ; Each new ship starts without pressure, preserving score/speed/lives.
 RESTART_ROUND:
     DI
+    CALL SFX_STOP                 ; each new life starts silent
     ; Pressure is local to ONE life, regardless of how it was lost.
     ; Also reset the partial 3-screen distance on every respawn.
     XOR A
@@ -138,16 +141,19 @@ MAIN_LOOP:
     CALL READ_INPUT
     DEBUG_PHASE DBG_LOGIC_COLOUR
     CALL UPDATE_GAME
-    JR .FRAME_END
+    JR .FRAME_SOUND
 .EXPLODING:
     ; The only moving item during this mode is the ship explosion.
     DEBUG_PHASE DBG_LOGIC_COLOUR
     CALL UPDATE_BLAST_ANIM
+.FRAME_SOUND:
+    CALL SFX_TICK                  ; bounded short pulse; skip on PAUSED
 .FRAME_END:
     DEBUG_PHASE DBG_IDLE_COLOUR
     JR MAIN_LOOP
 
     INCLUDE "menu.asm"
+    INCLUDE "sfx.asm"
     INCLUDE "logic.asm"
     INCLUDE "bullets.asm"
     INCLUDE "enemies.asm"

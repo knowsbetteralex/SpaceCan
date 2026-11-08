@@ -13,6 +13,7 @@ SHOW_START_MENU:
     LD A,STATE_MENU
     LD (GAME_STATE),A
     DI
+    CALL SFX_STOP
     CALL LOAD_SPACE_CAN_SCREEN
     CALL DRAW_MENU_LOGO
     LD A,#46                       ; bright yellow title and subtitle
@@ -56,6 +57,7 @@ SHOW_GAME_OVER:
     LD A,STATE_GAME_OVER
     LD (GAME_STATE),A
     DI
+    CALL SFX_STOP
     CALL DRAW_STATIC_UI
     LD A,1
     LD (HUD_DIRTY),A
