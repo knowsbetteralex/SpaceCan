@@ -1,4 +1,4 @@
-; SpaceCan Step 16.1: universal beeper title intro before AY.
+; SpaceCan Step 17: IM2 50Hz IRQ; AY runs inside interrupt.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -6,6 +6,8 @@
 ; Render after HALT; update logic and moving stars for NEXT frame.
 
     ORG #9000
+
+    INCLUDE "im2.asm"
 
 ; Set 0 to skip AY access; beeper title intro plays in both modes.
 AY_MUSIC_ENABLED EQU 1
@@ -77,13 +79,14 @@ B_DRAW_HALF EQU 8  ; 4px offset of last drawn picture
 
 START:
     DI
+    LD SP,IM2_STACK_TOP          ; isolated stack below IM2 gate, never overwrite vectors
     LD A,1
     LD (SFX_FE_BASE),A            ; border/MIC shadow for beeper pulses
     OUT (#FE),A
-    IM 1                         ; 48K ROM interrupt handler
     IF AY_MUSIC_ENABLED
         CALL AY_INIT
     ENDIF
+    CALL IM2_INSTALL             ; full 257-byte vector table + #FDFD jump
     EI
     JP SHOW_START_MENU
 
@@ -111,7 +114,8 @@ START_NEW_GAME:
 
 ; Each new ship starts without pressure, preserving score/speed/lives.
 RESTART_ROUND:
-    DI
+    ; Keep IM2 enabled while the screen is reconstructed: AY never
+    ; touches graphics and must continue across new lives.
     CALL SFX_STOP                 ; each new life starts silent
     ; Pressure is local to ONE life, regardless of how it was lost.
     ; Also reset the partial 3-screen distance on every respawn.
@@ -123,7 +127,6 @@ RESTART_ROUND:
     CALL RESET_ROUND_OBJECTS
     LD A,STATE_PLAYING
     LD (GAME_STATE),A
-    EI
     JP MAIN_LOOP
 
 MAIN_LOOP:
@@ -158,9 +161,7 @@ MAIN_LOOP:
     DEBUG_PHASE DBG_LOGIC_COLOUR
     CALL UPDATE_BLAST_ANIM
 .FRAME_SOUND:
-    IF AY_MUSIC_ENABLED
-        CALL AY_TICK             ; one 50Hz register frame, before beeper SFX
-    ENDIF
+    ; AY_TICK is IRQ-driven now; only beeper SFX remains here.
     CALL SFX_TICK                  ; bounded short pulse; skip on PAUSED
 .FRAME_END:
     DEBUG_PHASE DBG_IDLE_COLOUR
@@ -182,3 +183,7 @@ MAIN_LOOP:
     INCLUDE "ui.asm"
     INCLUDE "data.asm"
     INCLUDE "artwork.asm"
+
+PROGRAM_IMAGE_END:
+    ; Stack reserve begins below #FDFD; reject builds that overlap it.
+    ASSERT PROGRAM_IMAGE_END < IM2_STACK_GUARD

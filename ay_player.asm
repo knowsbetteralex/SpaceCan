@@ -3,10 +3,12 @@
 ;
 ; AY_INIT     reset hardware/shadow
 ; AY_PLAY     HL -> AYM1 blob (header + command stream)
-; AY_TICK     one stream frame (preserves BC,DE,HL,IX)
+; AY_TICK     IM2-only, one stream frame (preserves BC,DE,HL,IX)
 ; AY_PAUSE    mute and freeze stream; do not reset AY R13
 ; AY_RESUME   restore R7 and R8-R10 from last logical frame
 ; AY_STOP     stop stream, mute hardware
+; Public control routines preserve the incoming interrupt-enable state
+; and are safe against IM2 AY_TICK. Only the ISR calls AY_STOP_RAW.
 ;
 ; Runtime only writes R0..R13. Converter resolves MIDI overlapping
 ; notes, channel allocation, tempo, ADSR/velocity OFFLINE.
@@ -31,7 +33,20 @@ AY_RESET_SHADOW:
     LD (AY_SHADOW+7),A
     RET
 
+; Atomic mainline control entry. LD A,I copies IFF2 to P/V.
+; Save flags BEFORE DI. Do not force EI if the caller entered with DI.
 AY_STOP:
+    LD A,I
+    PUSH AF
+    DI
+    CALL AY_STOP_RAW
+    POP AF
+    RET PO
+    EI
+    RET
+
+; Raw stop is ALSO called from the IM2 decoder: must not EI.
+AY_STOP_RAW:
     XOR A
     LD (AY_ACTIVE),A
     LD (AY_PAUSED),A
@@ -44,8 +59,18 @@ AY_STOP:
 ; Data begins at +16. Size includes header. Loop offset must
 ; point to the beginning of a command, not the terminal END byte.
 AY_PLAY:
+    LD A,I
+    PUSH AF
+    DI
+    CALL AY_PLAY_RAW
+    POP AF
+    RET PO
+    EI
+    RET
+
+AY_PLAY_RAW:
     PUSH HL
-    CALL AY_STOP
+    CALL AY_STOP_RAW
     CALL AY_RESET_SHADOW
     POP HL
     LD (AY_BASE),HL
@@ -129,9 +154,19 @@ AY_PLAY:
     LD (AY_ACTIVE),A
     RET
 .INVALID:
-    JP AY_STOP                    ; malformed header -> silence
+    JP AY_STOP_RAW                ; malformed header -> silence
 
 AY_PAUSE:
+    LD A,I
+    PUSH AF
+    DI
+    CALL AY_PAUSE_RAW
+    POP AF
+    RET PO
+    EI
+    RET
+
+AY_PAUSE_RAW:
     LD A,(AY_ACTIVE)
     OR A
     RET Z
@@ -140,6 +175,16 @@ AY_PAUSE:
     JP AY_SILENCE                 ; keep AY_SHADOW unchanged
 
 AY_RESUME:
+    LD A,I
+    PUSH AF
+    DI
+    CALL AY_RESUME_RAW
+    POP AF
+    RET PO
+    EI
+    RET
+
+AY_RESUME_RAW:
     LD A,(AY_ACTIVE)
     OR A
     RET Z
@@ -194,7 +239,7 @@ AY_TICK_INTERNAL:
     OR A
     SBC HL,DE
     POP HL
-    JP NC,AY_STOP
+    JP NC,AY_STOP_RAW
     LD A,(HL)
     INC HL
     OR A
@@ -202,7 +247,7 @@ AY_TICK_INTERNAL:
     CP #80
     JP Z,.REG_FRAME
     BIT 7,A
-    JP NZ,AY_STOP                 ; 81..FF reserved
+    JP NZ,AY_STOP_RAW             ; 81..FF reserved
     DEC A                         ; WAIT n: n ticks of silence
     LD (AY_WAIT),A
     LD (AY_POS),HL
@@ -215,7 +260,7 @@ AY_TICK_INTERNAL:
     INC HL
     LD A,B
     AND #C0
-    JP NZ,AY_STOP                 ; bits 14/15 reserved
+    JP NZ,AY_STOP_RAW             ; bits 14/15 reserved
     LD D,0                        ; AY register 0..13
 .NEXT_REG:
     LD A,B
@@ -256,11 +301,11 @@ AY_TICK_INTERNAL:
 .TRACK_END:
     LD A,(AY_FLAGS)
     AND 1
-    JP Z,AY_STOP
+    JP Z,AY_STOP_RAW
     LD HL,(AY_LOOP_PTR)
     LD A,(HL)
     OR A
-    JP Z,AY_STOP                  ; no endless zero-length loop
+    JP Z,AY_STOP_RAW              ; no endless zero-length loop
     LD (AY_POS),HL
     JP .DECODE                    ; loop boundary has no extra tick
 

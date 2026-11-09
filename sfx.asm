@@ -7,7 +7,7 @@
 ; Ship explosion uses a dedicated irregular pulse routine.
 ; SFX_STOP:  silence immediately, preserving border (clobbers AF).
 ; Priority: SHIP > PENALTY > KILL > HIT > SHOT.
-; Only called from mainline, never from IM1 ISR.
+; Only called from mainline; beeper pulses are atomic vs IM2.
 ; Port #FE lower bits: BORDER (0..2), MIC (3), EAR (4).
 ; -------------------------------------------------------------
 SFX_SHOT    EQU 1
@@ -95,6 +95,7 @@ SFX_TICK:
     JR C,.PORT
     LD B,2
 .PORT:
+    DI                             ; prevent IRQ in a HIGH EAR pulse
     LD A,(SFX_FE_BASE)
     AND #0F                       ; keep border and MIC, EAR cleared
     LD D,A
@@ -114,6 +115,7 @@ SFX_TICK:
     DEC A
     JR NZ,.LOW_WAIT
     DJNZ .PULSE                   ; EAR always low between frames
+    EI                             ; IRQ may now update AY safely
 
     LD HL,SFX_FRAMES
     DEC (HL)
@@ -152,6 +154,7 @@ SFX_SHIP_TICK:
     AND 1
     JR Z,.ADVANCE                ; scattered tail, no audible tone
 .PLAY:
+    DI                             ; protect noisy ship burst as well
     LD A,(SFX_FE_BASE)
     AND #0F
     LD D,A                       ; EAR off + preserved border/MIC
@@ -185,6 +188,7 @@ SFX_SHIP_TICK:
     DEC A
     JR NZ,.LOW_WAIT
     DJNZ .PULSE
+    EI                             ; last EAR state is low
 
 .ADVANCE:
     LD HL,SFX_FRAMES

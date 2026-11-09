@@ -94,7 +94,7 @@ SHOW_GAME_OVER:
     LD DE,MENU_BACK_TO_TITLE
     CALL MENU_PRINT_TEXT
 
-    ; AY ending updates per 50Hz frame, beeper is the 48K fallback.
+    ; AY ending advances in IM2; beeper is the 48K fallback.
     IF AY_MUSIC_ENABLED
         LD HL,AY_MUSIC_GAME_OVER
         CALL AY_PLAY
@@ -106,11 +106,6 @@ SHOW_GAME_OVER:
     LD B,GAME_OVER_FRAMES
 .HOLD:
     HALT
-    IF AY_MUSIC_ENABLED
-        PUSH BC
-        CALL AY_TICK
-        POP BC
-    ENDIF
     DJNZ .HOLD
     JP SHOW_START_MENU            ; NOT a direct game restart
 
@@ -266,17 +261,11 @@ MENU_DRAW_PROMPT:
 MENU_WAIT_ANY_KEY:
 .RELEASE:
     HALT
-    IF AY_MUSIC_ENABLED
-        CALL AY_TICK
-    ENDIF
     CALL MENU_ANY_KEY
     OR A
     JR NZ,.RELEASE
 .PRESS:
     HALT
-    IF AY_MUSIC_ENABLED
-        CALL AY_TICK
-    ENDIF
     CALL MENU_BLINK_TICK
     CALL MENU_ANY_KEY
     OR A
