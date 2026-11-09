@@ -14,6 +14,10 @@ SHOW_START_MENU:
     LD (GAME_STATE),A
     DI
     CALL SFX_STOP
+    ; Stop any old AY track before the universal beeper intro.
+    IF AY_MUSIC_ENABLED
+        CALL AY_STOP
+    ENDIF
     CALL LOAD_SPACE_CAN_SCREEN
     CALL DRAW_MENU_LOGO
     LD A,#46                       ; bright yellow title and subtitle
@@ -49,14 +53,14 @@ SHOW_START_MENU:
     LD A,0
     LD (MENU_PROMPT_MODE),A        ; TO START
     CALL MENU_INIT_PROMPT
-    ; Play background AY registers if installed; otherwise retain
-    ; the original foreground beeper title jingle.
+    ; Always play the beeper title jingle, including on a
+    ; 48K without AY. The menu has already been fully drawn.
+    LD HL,MELODY_TITLE
+    CALL MELODY_PLAY
+    ; Then start AY background music, when enabled in the build.
     IF AY_MUSIC_ENABLED
         LD HL,AY_MUSIC_TITLE
         CALL AY_PLAY
-    ELSE
-        LD HL,MELODY_TITLE
-        CALL MELODY_PLAY
     ENDIF
     EI
     CALL MENU_WAIT_ANY_KEY
