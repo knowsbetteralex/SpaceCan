@@ -3,7 +3,7 @@
   "root": "main.asm",
   "loadingScreen": {
     "enabled": true,
-    "file": "assets\/spacecan_background.scr",
+    "file": "assets\/spacecan_title_menu_hud_999999.scr",
     "pauseFrames": 100
   }
 }
