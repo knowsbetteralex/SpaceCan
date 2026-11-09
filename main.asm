@@ -7,8 +7,6 @@
 
     ORG #9000
 
-    INCLUDE "im2.asm"
-
 ; Set 0 to skip AY access; beeper title intro plays in both modes.
 AY_MUSIC_ENABLED EQU 1
 AY_TARGET_CLOCK EQU 2000000    ; Delta-C AY board, check real oscillator
@@ -183,6 +181,7 @@ MAIN_LOOP:
     INCLUDE "ui.asm"
     INCLUDE "data.asm"
     INCLUDE "artwork.asm"
+    INCLUDE "im2.asm"
 
 PROGRAM_IMAGE_END:
     ; Stack reserve begins below #FDFD; reject builds that overlap it.
