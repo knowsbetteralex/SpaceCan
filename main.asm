@@ -1,4 +1,4 @@
-; SpaceCan Step 15.1: low-noise ship explosion, BPM-aware melodies.
+; SpaceCan Step 16: AYM1 AY register-stream playback + beeper SFX.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -6,6 +6,10 @@
 ; Render after HALT; update logic and moving stars for NEXT frame.
 
     ORG #9000
+
+; Set to 0 to run without AY hardware; beeper title/end fallback.
+AY_MUSIC_ENABLED EQU 1
+AY_TARGET_CLOCK EQU 2000000    ; Delta-C AY board, check real oscillator
 
 BLAST_FRAME_DURATION EQU 4
 BLAST_FRAME_COUNT    EQU 4
@@ -77,6 +81,9 @@ START:
     LD (SFX_FE_BASE),A            ; border/MIC shadow for beeper pulses
     OUT (#FE),A
     IM 1                         ; 48K ROM interrupt handler
+    IF AY_MUSIC_ENABLED
+        CALL AY_INIT
+    ENDIF
     EI
     JP SHOW_START_MENU
 
@@ -84,6 +91,10 @@ START:
 ; only here are score, speed and lives reset.
 START_NEW_GAME:
     CALL SFX_STOP                 ; silence any earlier effect
+    IF AY_MUSIC_ENABLED
+        LD HL,AY_MUSIC_GAME
+        CALL AY_PLAY             ; continues across ship respawns
+    ENDIF
     XOR A
     LD (SCORE),A
     LD (SCORE+1),A
@@ -147,6 +158,9 @@ MAIN_LOOP:
     DEBUG_PHASE DBG_LOGIC_COLOUR
     CALL UPDATE_BLAST_ANIM
 .FRAME_SOUND:
+    IF AY_MUSIC_ENABLED
+        CALL AY_TICK             ; one 50Hz register frame, before beeper SFX
+    ENDIF
     CALL SFX_TICK                  ; bounded short pulse; skip on PAUSED
 .FRAME_END:
     DEBUG_PHASE DBG_IDLE_COLOUR
@@ -155,6 +169,9 @@ MAIN_LOOP:
     INCLUDE "menu.asm"
     INCLUDE "sfx.asm"
     INCLUDE "melodies.asm"
+    INCLUDE "ay_driver.asm"
+    INCLUDE "ay_player.asm"
+    INCLUDE "music.asm"
     INCLUDE "logic.asm"
     INCLUDE "bullets.asm"
     INCLUDE "enemies.asm"
