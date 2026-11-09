@@ -1,4 +1,4 @@
-; SpaceCan Step 16: AYM1 AY register-stream playback + beeper SFX.
+; SpaceCan Step 16.1: universal beeper title intro before AY.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -7,7 +7,7 @@
 
     ORG #9000
 
-; Set to 0 to run without AY hardware; beeper title/end fallback.
+; Set 0 to skip AY access; beeper title intro plays in both modes.
 AY_MUSIC_ENABLED EQU 1
 AY_TARGET_CLOCK EQU 2000000    ; Delta-C AY board, check real oscillator
 
