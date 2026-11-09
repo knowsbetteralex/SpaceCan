@@ -49,10 +49,15 @@ SHOW_START_MENU:
     LD A,0
     LD (MENU_PROMPT_MODE),A        ; TO START
     CALL MENU_INIT_PROMPT
-    ; Title is fully drawn before the short original beeper fanfare.
-    ; This may block input for about a second, but never the game loop.
-    LD HL,MELODY_TITLE
-    CALL MELODY_PLAY
+    ; Play background AY registers if installed; otherwise retain
+    ; the original foreground beeper title jingle.
+    IF AY_MUSIC_ENABLED
+        LD HL,AY_MUSIC_TITLE
+        CALL AY_PLAY
+    ELSE
+        LD HL,MELODY_TITLE
+        CALL MELODY_PLAY
+    ENDIF
     EI
     CALL MENU_WAIT_ANY_KEY
     JP START_NEW_GAME
@@ -85,14 +90,23 @@ SHOW_GAME_OVER:
     LD DE,MENU_BACK_TO_TITLE
     CALL MENU_PRINT_TEXT
 
-    ; Original beeper ending after drawing the score, then a short
-    ; 50Hz hold. The tune runs outside the normal gameplay loop.
-    LD HL,MELODY_GAME_OVER
-    CALL MELODY_PLAY
+    ; AY ending updates per 50Hz frame, beeper is the 48K fallback.
+    IF AY_MUSIC_ENABLED
+        LD HL,AY_MUSIC_GAME_OVER
+        CALL AY_PLAY
+    ELSE
+        LD HL,MELODY_GAME_OVER
+        CALL MELODY_PLAY
+    ENDIF
     EI
     LD B,GAME_OVER_FRAMES
 .HOLD:
     HALT
+    IF AY_MUSIC_ENABLED
+        PUSH BC
+        CALL AY_TICK
+        POP BC
+    ENDIF
     DJNZ .HOLD
     JP SHOW_START_MENU            ; NOT a direct game restart
 
@@ -248,11 +262,17 @@ MENU_DRAW_PROMPT:
 MENU_WAIT_ANY_KEY:
 .RELEASE:
     HALT
+    IF AY_MUSIC_ENABLED
+        CALL AY_TICK
+    ENDIF
     CALL MENU_ANY_KEY
     OR A
     JR NZ,.RELEASE
 .PRESS:
     HALT
+    IF AY_MUSIC_ENABLED
+        CALL AY_TICK
+    ENDIF
     CALL MENU_BLINK_TICK
     CALL MENU_ANY_KEY
     OR A
@@ -306,6 +326,9 @@ HANDLE_PAUSE_KEY:
     LD (PAUSE_PREVIOUS_STATE),A
     LD A,STATE_PAUSED
     LD (GAME_STATE),A
+    IF AY_MUSIC_ENABLED
+        CALL AY_PAUSE
+    ENDIF
     CALL SAVE_PAUSE_AREA
     LD A,#47
     LD (MENU_TEXT_ATTR),A
@@ -318,6 +341,9 @@ HANDLE_PAUSE_KEY:
     JP MELODY_PLAY
 .RESUME:
     CALL RESTORE_PAUSE_AREA
+    IF AY_MUSIC_ENABLED
+        CALL AY_RESUME
+    ENDIF
     LD A,(PAUSE_PREVIOUS_STATE)
     LD (GAME_STATE),A
     RET
