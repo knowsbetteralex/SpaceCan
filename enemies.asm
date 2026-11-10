@@ -45,7 +45,7 @@ INIT_ENEMIES:
     INC HL
 
     ; Every asteroid begins in a randomly selected vertical lane.
-    ; This test also avoids collisions with asteroids already at Y=4/5.
+    ; Entry checks enforce vertical spacing; lane search keeps X varied.
     PUSH HL
     PUSH BC
     CALL ENEMY_SPAWN_GAP_CLEAR
@@ -319,6 +319,7 @@ RANDOMIZE_ENEMY_APPEARANCE:
 ; -------------------------------------------------------------
 ENEMY_SPAWN_GAP_CLEAR:
     PUSH BC
+    PUSH DE
     PUSH IX
     LD A,(IX+E_Y)
     LD (ENEMY_TEST_Y),A
@@ -353,6 +354,7 @@ ENEMY_SPAWN_GAP_CLEAR:
     JR NC,.SKIP
 
     POP IX
+    POP DE
     POP BC
     SCF
     RET
@@ -361,6 +363,7 @@ ENEMY_SPAWN_GAP_CLEAR:
     ADD IX,DE
     DJNZ .NEXT
     POP IX
+    POP DE
     POP BC
     XOR A
     RET
