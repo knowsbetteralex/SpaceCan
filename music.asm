@@ -13,7 +13,7 @@ AY_MUSIC_TITLE:
     INCBIN "assets/music/title.aym"
 
 AY_MUSIC_GAME:
-    INCBIN "assets/music/game.aym"
+    INCBIN "assets/music/gol.aym"
 
 AY_MUSIC_GAME_OVER:
     INCBIN "assets/music/game_over.aym"
