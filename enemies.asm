@@ -1,11 +1,12 @@
 ; -------------------------------------------------------------
-; ENEMIES: five asteroids, 8 silhouettes (4 small + 4 large).
+; ENEMIES: four asteroids spread across the corridor; 8 silhouettes.
 ;
 ; IX -> current enemy slot. X is assigned at every spawn and
 ; remains constant until deactivation; overlapping spawn positions
 ; are rejected for objects currently occupying the entry rows.
 ; Game logic updates state/dirty; renderer stores drawn position.
-; Shape and palette are randomized at each successful spawn.
+; Shape/palette randomize per spawn. New appearances maintain a
+; vertical clearance; lane selection prefers horizontal clearance.
 ; -------------------------------------------------------------
 
 ; Initialise from ENEMY_START_TABLE: TYPE, START_Y, ANIM_PHASE.
@@ -47,7 +48,10 @@ INIT_ENEMIES:
     ; This test also avoids collisions with asteroids already at Y=4/5.
     PUSH HL
     PUSH BC
+    CALL ENEMY_SPAWN_GAP_CLEAR
+    JR C,.SPAWN_TESTED
     CALL SELECT_ENEMY_SPAWN_X
+.SPAWN_TESTED:
     POP BC
     POP HL
     JR C,.SKIP_ACTIVE
@@ -168,6 +172,8 @@ UPDATE_ENEMY_SLOT:
     RET NZ
     LD A,PLAYFIELD_TOP
     LD (IX+E_Y),A
+    CALL ENEMY_SPAWN_GAP_CLEAR
+    RET C                      ; wait until 3 clear rows at the entry
     CALL SELECT_ENEMY_SPAWN_X
     RET C                      ; entry row blocked: retry next tick
     CALL RANDOMIZE_ENEMY_APPEARANCE
@@ -188,9 +194,9 @@ UPDATE_ENEMY_SLOT:
     RET
 
 ; -------------------------------------------------------------
-; SPAWN X: choose a fresh left edge across the whole 20-cell
-; corridor. Reject candidates intersecting another asteroid at
-; the entry row(s), then try the next X until a free one is found.
+; SPAWN X: prefer lanes with a clear column between all asteroids.
+; When no well-separated lane fits, fall back to the existing
+; collision-free placement so the fourth asteroid is not starved.
 ; IX = the inactive/current slot; its logical Y is already set.
 ; OUT: carry clear = X selected, carry set = all cells occupied.
 ; Preserves BC, DE, HL and IX. Runs only on spawn, not each frame.
@@ -219,8 +225,10 @@ SELECT_ENEMY_SPAWN_X:
     LD B,PLAYFIELD_WIDTH       ; at most 16 candidate positions
 .TRY:
     CALL ENEMY_SPAWN_CLEAR
+    JR C,.STEP_NEXT
+    CALL ENEMY_SPAWN_LANE_CLEAR
     JR NC,.SUCCESS
-
+.STEP_NEXT:
     LD C,PLAYFIELD_RIGHT
     LD A,(IX+E_TYPE)
     OR A
@@ -237,10 +245,33 @@ SELECT_ENEMY_SPAWN_X:
 .SAVE_X:
     LD (IX+E_X),A
     DJNZ .TRY
+
+    ; All preferred lanes failed: retry without the cosmetic
+    ; horizontal gap. Spatial overlap is still forbidden.
+    LD B,PLAYFIELD_WIDTH
+.RELAX:
+    CALL ENEMY_SPAWN_CLEAR
+    JR NC,.SUCCESS
+    LD C,PLAYFIELD_RIGHT
+    LD A,(IX+E_TYPE)
+    OR A
+    JR Z,.RELAX_STEP
+    DEC C
+.RELAX_STEP:
+    LD A,(IX+E_X)
+    CP C
+    JR C,.RELAX_INC
+    LD A,PLAYFIELD_LEFT
+    JR .RELAX_STORE
+.RELAX_INC:
+    INC A
+.RELAX_STORE:
+    LD (IX+E_X),A
+    DJNZ .RELAX
     POP HL
     POP DE
     POP BC
-    SCF                         ; cannot spawn this tick
+    SCF                         ; no nonoverlapping lane exists
     RET
 .SUCCESS:
     POP HL
@@ -278,7 +309,120 @@ RANDOMIZE_ENEMY_APPEARANCE:
     POP BC
     RET
 
-; Current candidate is in (IX+E_X), new Y is PLAYFIELD_TOP.
+; -------------------------------------------------------------
+; Vertical spawn clearance (before lane search).
+; Require ENEMY_MIN_VERTICAL_GAP fully empty character rows
+; between the new asteroid footprint and every active asteroid,
+; even if their horizontal lanes differ.
+; In: IX = inactive/current slot with E_TYPE and E_Y set.
+; Out: carry set -> delay spawn. Preserves BC, DE, HL, IX.
+; -------------------------------------------------------------
+ENEMY_SPAWN_GAP_CLEAR:
+    PUSH BC
+    PUSH IX
+    LD A,(IX+E_Y)
+    LD (ENEMY_TEST_Y),A
+    LD A,(IX+E_TYPE)
+    LD (ENEMY_TEST_TYPE),A
+    LD IX,ENEMY_POOL
+    LD B,MAX_ENEMIES
+.NEXT:
+    LD A,(IX+E_ACTIVE)
+    OR A
+    JR Z,.SKIP
+
+    ; Existing top >= new bottom + gap + 1? Far below.
+    LD A,(ENEMY_TEST_Y)
+    LD C,A
+    LD A,(ENEMY_TEST_TYPE)
+    ADD A,C
+    ADD A,ENEMY_MIN_VERTICAL_GAP+1
+    CP (IX+E_Y)
+    JR C,.SKIP
+    JR Z,.SKIP
+
+    ; New top >= existing bottom + gap + 1? Far below.
+    LD A,(IX+E_Y)
+    LD C,A
+    LD A,(IX+E_TYPE)
+    ADD A,C
+    ADD A,ENEMY_MIN_VERTICAL_GAP+1
+    LD C,A
+    LD A,(ENEMY_TEST_Y)
+    CP C
+    JR NC,.SKIP
+
+    POP IX
+    POP BC
+    SCF
+    RET
+.SKIP:
+    LD DE,ENEMY_SLOT_SIZE
+    ADD IX,DE
+    DJNZ .NEXT
+    POP IX
+    POP BC
+    XOR A
+    RET
+
+; Prefer an empty horizontal column between the sprite rectangles,
+; to avoid multiple asteroids forming one continuous vertical line.
+; This is cosmetic: caller falls back to ENEMY_SPAWN_CLEAR if needed.
+; In: IX=new slot, E_X/E_TYPE already set.
+; Out: carry set -> lane too near another ACTIVE asteroid.
+; Preserves BC, DE, HL, IX.
+ENEMY_SPAWN_LANE_CLEAR:
+    PUSH BC
+    PUSH DE
+    PUSH IX
+    LD A,(IX+E_X)
+    LD (ENEMY_TEST_X),A
+    LD A,(IX+E_TYPE)
+    LD (ENEMY_TEST_TYPE),A
+    LD IX,ENEMY_POOL
+    LD B,MAX_ENEMIES
+.NEXT:
+    LD A,(IX+E_ACTIVE)
+    OR A
+    JR Z,.SKIP
+
+    ; Candidate right + gap + 1 <= existing left is allowed.
+    LD A,(ENEMY_TEST_X)
+    LD C,A
+    LD A,(ENEMY_TEST_TYPE)
+    ADD A,C
+    ADD A,ENEMY_MIN_LANE_GAP+1
+    CP (IX+E_X)
+    JR C,.SKIP
+    JR Z,.SKIP
+
+    ; Existing right + gap + 1 <= candidate left is allowed.
+    LD A,(IX+E_X)
+    LD C,A
+    LD A,(IX+E_TYPE)
+    ADD A,C
+    ADD A,ENEMY_MIN_LANE_GAP+1
+    LD C,A
+    LD A,(ENEMY_TEST_X)
+    CP C
+    JR NC,.SKIP
+
+    POP IX
+    POP DE
+    POP BC
+    SCF
+    RET
+.SKIP:
+    LD DE,ENEMY_SLOT_SIZE
+    ADD IX,DE
+    DJNZ .NEXT
+    POP IX
+    POP DE
+    POP BC
+    XOR A
+    RET
+
+; Current candidate is in (IX+E_X), new Y is already stored in slot.
 ; A collision can only happen with an active asteroid whose top
 ; currently occupies Y=4 or 5 (for a new 2-row large asteroid).
 ; Carry set: candidate intersects an active asteroid.
