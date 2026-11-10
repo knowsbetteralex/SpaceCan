@@ -111,13 +111,14 @@ PAUSE_SAVED_ATTR:
 SHIP_MOVE_TIMER:
     DB 0                        ; frames until next horizontal step
 
-; Four independent falling objects. On EVERY spawn, X is
-; freshly selected in the full corridor using an 8-bit LFSR.
-; The initial table stores only TYPE, START_Y, ANIMATION_PHASE.
+; Five independent falling objects. On EVERY spawn, lane/shape/shade
+; are freshly selected via LFSR. The initial table is TYPE,Y,PHASE.
 ENEMY_START_TABLE:
-    DB 0,4,1                    ; small 8x8, first animation in 1 tick
-    DB 1,11,3                   ; large, first animation in 3 ticks
-    DB 0,17,5                   ; small, first animation in 5 ticks
+    DB 0,4,1                    ; small 8x8
+    DB 1,8,3                    ; large 16x16
+    DB 0,12,5                   ; small 8x8
+    DB 1,16,7                   ; large 16x16
+    DB 0,20,2                   ; small 8x8
 
 ENEMY_MOVE_TIMER:
     DB 4
@@ -136,15 +137,35 @@ ENEMY_TEST_Y:
 ENEMY_POOL:
     DS MAX_ENEMIES*ENEMY_SLOT_SIZE,0
 
-ENEMY_ATTR_SMALL:
-    DB #42                      ; bright red
-ENEMY_ATTR_LARGE:
-    DB #45,#45                  ; bright cyan
+; Every spawned asteroid picks one of eight shades. The 16x16
+; asteroid uses a dim/bright pair of attributes for a two-tone look.
+; Attribute values: bright bit #40, paper 0 (black), ink 0..7.
+ENEMY_SMALL_COLOURS:
+    DB #07,#47,#05,#45,#03,#43,#06,#46
+    ; gray, white, dark cyan, cyan, dark violet, violet, ochre, gold
+
+ENEMY_LARGE_COLOURS:
+    DB #07,#47                   ; slate + ice
+    DB #47,#07                   ; ice + slate
+    DB #05,#45                   ; blue-green
+    DB #45,#05
+    DB #03,#43                   ; purple
+    DB #43,#03
+    DB #06,#46                   ; golden rock
+    DB #46,#06
 
 ENEMY_FRAMES:
-    ; 4 rotation frames per type, each 90 degrees clockwise.
+    ; SMALL: [0] classic, [1] chipped, [2] crater, [3] splinter.
+    ; Each group has four clockwise-rotation frames.
     DW ENEMY_SMALL_0,ENEMY_SMALL_1,ENEMY_SMALL_2,ENEMY_SMALL_3
+    DW ENEMY_SMALL_CHIP_0,ENEMY_SMALL_CHIP_1,ENEMY_SMALL_CHIP_2,ENEMY_SMALL_CHIP_3
+    DW ENEMY_SMALL_CRATER_0,ENEMY_SMALL_CRATER_1,ENEMY_SMALL_CRATER_2,ENEMY_SMALL_CRATER_3
+    DW ENEMY_SMALL_SPLINTER_0,ENEMY_SMALL_SPLINTER_1,ENEMY_SMALL_SPLINTER_2,ENEMY_SMALL_SPLINTER_3
+    ; LARGE: [0] classic, [1] jagged, [2] crater, [3] shard.
     DW ENEMY_LARGE_0,ENEMY_LARGE_1,ENEMY_LARGE_2,ENEMY_LARGE_3
+    DW ENEMY_LARGE_JAGGED_0,ENEMY_LARGE_JAGGED_1,ENEMY_LARGE_JAGGED_2,ENEMY_LARGE_JAGGED_3
+    DW ENEMY_LARGE_CRATER_0,ENEMY_LARGE_CRATER_1,ENEMY_LARGE_CRATER_2,ENEMY_LARGE_CRATER_3
+    DW ENEMY_LARGE_SHARD_0,ENEMY_LARGE_SHARD_1,ENEMY_LARGE_SHARD_2,ENEMY_LARGE_SHARD_3
 
 ; Small 8x8: 8 bytes/frame. Large 16x16: 32 bytes/frame.
 ; No masking or backdrop saving; sprites draw opaque.
@@ -259,6 +280,322 @@ ENEMY_LARGE_3:
     DB #1F,#F8
     DB #07,#F0
     DB #03,#C0
+
+
+; Additional asteroid silhouettes. Rotation frames are precomputed
+; OFFLINE; the Z80 still draws directly without shifts or masks.
+ENEMY_SMALL_CHIP_0:
+    DB %00111000
+    DB %01111100
+    DB %11111110
+    DB %11110111
+    DB %01111111
+    DB %00101110
+    DB %00011100
+    DB %00001000
+ENEMY_SMALL_CHIP_1:
+    DB %00001100
+    DB %00011110
+    DB %00111111
+    DB %01011111
+    DB %11110111
+    DB %01111110
+    DB %00111100
+    DB %00011000
+ENEMY_SMALL_CHIP_2:
+    DB %00010000
+    DB %00111000
+    DB %01110100
+    DB %11111110
+    DB %11101111
+    DB %01111111
+    DB %00111110
+    DB %00011100
+ENEMY_SMALL_CHIP_3:
+    DB %00011000
+    DB %00111100
+    DB %01111110
+    DB %11101111
+    DB %11111010
+    DB %11111100
+    DB %01111000
+    DB %00110000
+ENEMY_SMALL_CRATER_0:
+    DB %00011000
+    DB %01111110
+    DB %11100111
+    DB %11000011
+    DB %11010011
+    DB %11100111
+    DB %01111110
+    DB %00011000
+ENEMY_SMALL_CRATER_1:
+    DB %00111100
+    DB %01111110
+    DB %01100110
+    DB %11010011
+    DB %11000011
+    DB %01100110
+    DB %01111110
+    DB %00111100
+ENEMY_SMALL_CRATER_2:
+    DB %00011000
+    DB %01111110
+    DB %11100111
+    DB %11001011
+    DB %11000011
+    DB %11100111
+    DB %01111110
+    DB %00011000
+ENEMY_SMALL_CRATER_3:
+    DB %00111100
+    DB %01111110
+    DB %01100110
+    DB %11000011
+    DB %11001011
+    DB %01100110
+    DB %01111110
+    DB %00111100
+ENEMY_SMALL_SPLINTER_0:
+    DB %00100100
+    DB %01111100
+    DB %11111110
+    DB %01101111
+    DB %11111110
+    DB %00111100
+    DB %01111110
+    DB %00010100
+ENEMY_SMALL_SPLINTER_1:
+    DB %00010100
+    DB %01011110
+    DB %01111111
+    DB %11110110
+    DB %01111110
+    DB %11111111
+    DB %01011100
+    DB %00001000
+ENEMY_SMALL_SPLINTER_2:
+    DB %00101000
+    DB %01111110
+    DB %00111100
+    DB %01111111
+    DB %11110110
+    DB %01111111
+    DB %00111110
+    DB %00100100
+ENEMY_SMALL_SPLINTER_3:
+    DB %00010000
+    DB %00111010
+    DB %11111111
+    DB %01111110
+    DB %01101111
+    DB %11111110
+    DB %01111010
+    DB %00101000
+ENEMY_LARGE_JAGGED_0:
+    DB #03,#80
+    DB #0F,#C0
+    DB #1F,#E0
+    DB #3E,#F0
+    DB #7F,#F8
+    DB #FF,#FC
+    DB #7F,#FE
+    DB #3F,#FF
+    DB #1F,#FF
+    DB #0F,#FE
+    DB #3F,#FC
+    DB #7F,#F8
+    DB #6F,#F0
+    DB #3F,#E0
+    DB #1F,#80
+    DB #06,#00
+ENEMY_LARGE_JAGGED_1:
+    DB #00,#20
+    DB #18,#70
+    DB #3C,#F8
+    DB #6D,#FC
+    DB #7F,#FE
+    DB #FF,#FE
+    DB #FF,#FF
+    DB #7F,#F7
+    DB #7F,#FF
+    DB #3F,#FE
+    DB #3F,#FC
+    DB #1F,#F8
+    DB #0F,#F0
+    DB #07,#E0
+    DB #03,#C0
+    DB #01,#80
+ENEMY_LARGE_JAGGED_2:
+    DB #00,#60
+    DB #01,#F8
+    DB #07,#FC
+    DB #0F,#F6
+    DB #1F,#FE
+    DB #3F,#FC
+    DB #7F,#F0
+    DB #FF,#F8
+    DB #FF,#FC
+    DB #7F,#FE
+    DB #3F,#FF
+    DB #1F,#FE
+    DB #0F,#7C
+    DB #07,#F8
+    DB #03,#F0
+    DB #01,#C0
+ENEMY_LARGE_JAGGED_3:
+    DB #01,#80
+    DB #03,#C0
+    DB #07,#E0
+    DB #0F,#F0
+    DB #1F,#F8
+    DB #3F,#FC
+    DB #7F,#FC
+    DB #FF,#FE
+    DB #EF,#FE
+    DB #FF,#FF
+    DB #7F,#FF
+    DB #7F,#FE
+    DB #3F,#B6
+    DB #1F,#3C
+    DB #0E,#18
+    DB #04,#00
+ENEMY_LARGE_CRATER_0:
+    DB #07,#C0
+    DB #1F,#F0
+    DB #3F,#F8
+    DB #7F,#FC
+    DB #FF,#FE
+    DB #F8,#3F
+    DB #F0,#1F
+    DB #E0,#0F
+    DB #E0,#1F
+    DB #F0,#3F
+    DB #F8,#7E
+    DB #7F,#FE
+    DB #3F,#FC
+    DB #1F,#F8
+    DB #0F,#E0
+    DB #03,#80
+ENEMY_LARGE_CRATER_1:
+    DB #07,#F0
+    DB #0F,#F8
+    DB #1F,#FC
+    DB #3E,#7E
+    DB #7C,#3E
+    DB #78,#1F
+    DB #F8,#1F
+    DB #F8,#1F
+    DB #F8,#1F
+    DB #7C,#1F
+    DB #7E,#3E
+    DB #3F,#7E
+    DB #3F,#FC
+    DB #1F,#F8
+    DB #0F,#F0
+    DB #03,#E0
+ENEMY_LARGE_CRATER_2:
+    DB #01,#C0
+    DB #07,#F0
+    DB #1F,#F8
+    DB #3F,#FC
+    DB #7F,#FE
+    DB #7E,#1F
+    DB #FC,#0F
+    DB #F8,#07
+    DB #F0,#07
+    DB #F8,#0F
+    DB #FC,#1F
+    DB #7F,#FF
+    DB #3F,#FE
+    DB #1F,#FC
+    DB #0F,#F8
+    DB #03,#E0
+ENEMY_LARGE_CRATER_3:
+    DB #07,#C0
+    DB #0F,#F0
+    DB #1F,#F8
+    DB #3F,#FC
+    DB #7E,#FC
+    DB #7C,#7E
+    DB #F8,#3E
+    DB #F8,#1F
+    DB #F8,#1F
+    DB #F8,#1F
+    DB #F8,#1E
+    DB #7C,#3E
+    DB #7E,#7C
+    DB #3F,#F8
+    DB #1F,#F0
+    DB #0F,#E0
+ENEMY_LARGE_SHARD_0:
+    DB #01,#80
+    DB #0F,#E0
+    DB #1E,#F0
+    DB #3F,#F8
+    DB #7F,#7C
+    DB #7C,#3E
+    DB #FD,#7F
+    DB #FF,#FF
+    DB #FB,#FE
+    DB #78,#FE
+    DB #7F,#FC
+    DB #3F,#B8
+    DB #1F,#F0
+    DB #1D,#E0
+    DB #0F,#80
+    DB #05,#00
+ENEMY_LARGE_SHARD_1:
+    DB #01,#C0
+    DB #07,#F0
+    DB #0F,#F8
+    DB #3F,#FC
+    DB #7F,#FE
+    DB #FC,#FE
+    DB #5D,#9E
+    DB #FD,#DB
+    DB #7F,#8F
+    DB #37,#DE
+    DB #3F,#FE
+    DB #1F,#FC
+    DB #0F,#F8
+    DB #07,#F0
+    DB #03,#E0
+    DB #00,#C0
+ENEMY_LARGE_SHARD_2:
+    DB #00,#A0
+    DB #01,#F0
+    DB #07,#B8
+    DB #0F,#F8
+    DB #1D,#FC
+    DB #3F,#FE
+    DB #7F,#1E
+    DB #7F,#DF
+    DB #FF,#FF
+    DB #FE,#BF
+    DB #7C,#3E
+    DB #3E,#FE
+    DB #1F,#FC
+    DB #0F,#78
+    DB #07,#F0
+    DB #01,#80
+ENEMY_LARGE_SHARD_3:
+    DB #03,#00
+    DB #07,#C0
+    DB #0F,#E0
+    DB #1F,#F0
+    DB #3F,#F8
+    DB #7F,#FC
+    DB #7B,#EC
+    DB #F1,#FE
+    DB #DB,#BF
+    DB #79,#BA
+    DB #7F,#3F
+    DB #7F,#FE
+    DB #3F,#FC
+    DB #1F,#F0
+    DB #0F,#E0
+    DB #03,#80
 
 BULLET_COUNT:
     DB 0                        ; active bullets (0..6)

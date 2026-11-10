@@ -1,10 +1,11 @@
 ; -------------------------------------------------------------
-; ENEMIES: three asteroids falling vertically (8x8 and 16x16).
+; ENEMIES: five asteroids, 8 silhouettes (4 small + 4 large).
 ;
 ; IX -> current enemy slot. X is assigned at every spawn and
 ; remains constant until deactivation; overlapping spawn positions
 ; are rejected for objects currently occupying the entry rows.
 ; Game logic updates state/dirty; renderer stores drawn position.
+; Shape and palette are randomized at each successful spawn.
 ; -------------------------------------------------------------
 
 ; Initialise from ENEMY_START_TABLE: TYPE, START_Y, ANIM_PHASE.
@@ -50,6 +51,7 @@ INIT_ENEMIES:
     POP BC
     POP HL
     JR C,.SKIP_ACTIVE
+    CALL RANDOMIZE_ENEMY_APPEARANCE
     LD A,1
     LD (IX+E_ACTIVE),A
     LD (IX+E_DIRTY),A
@@ -168,6 +170,7 @@ UPDATE_ENEMY_SLOT:
     LD (IX+E_Y),A
     CALL SELECT_ENEMY_SPAWN_X
     RET C                      ; entry row blocked: retry next tick
+    CALL RANDOMIZE_ENEMY_APPEARANCE
     LD A,(IX+E_TYPE)
     OR A
     LD A,1
@@ -247,7 +250,7 @@ SELECT_ENEMY_SPAWN_X:
     RET
 
 ; 8-bit maximal-length Galois LFSR, polynomial #1D.
-; A new X is chosen only on spawn. Never re-seed on respawn.
+; Used for lane, shape and shade; never re-seed on respawn.
 NEXT_ENEMY_RANDOM:
     LD A,(ENEMY_RANDOM_STATE)
     ADD A,A
@@ -255,6 +258,24 @@ NEXT_ENEMY_RANDOM:
     XOR #1D
 .STORE:
     LD (ENEMY_RANDOM_STATE),A
+    RET
+
+; Pick one of four silhouettes and eight palettes for this spawn.
+; A fresh appearance is generated on every respawn, not each frame.
+; Preserves BC/DE/HL/IX; modifies AF and carry.
+RANDOMIZE_ENEMY_APPEARANCE:
+    PUSH BC
+    CALL NEXT_ENEMY_RANDOM
+    LD C,A
+    AND 3
+    LD (IX+E_VARIANT),A
+    LD A,C
+    RLCA
+    RLCA
+    RLCA
+    AND 7
+    LD (IX+E_SHADE),A
+    POP BC
     RET
 
 ; Current candidate is in (IX+E_X), new Y is PLAYFIELD_TOP.
@@ -540,14 +561,18 @@ RENDER_DRAW_ENEMIES:
     DJNZ .NEXT
     RET
 
-; Frame table: small0..3, large0..3 (DW pointers).
-; OUT: DE=bitmap address. IX and BC preserved.
+; Bitmap table layout: 4 shapes per size, 4 rotation frames/shape.
+; Index = 2 * ((TYPE*4 + VARIANT)*4 + FRAME), max 62 bytes.
+; OUT: DE=bitmap address. Preserves BC, IX.
 GET_ENEMY_FRAME:
     LD A,(IX+E_TYPE)
     ADD A,A
-    ADD A,A                    ; TYPE*4 (four frames per type)
+    ADD A,A                    ; 4 silhouettes per size
+    ADD A,(IX+E_VARIANT)
+    ADD A,A
+    ADD A,A                    ; 4 frames per silhouette
     ADD A,(IX+E_FRAME)
-    ADD A,A                    ; two bytes per table entry
+    ADD A,A                    ; DW pointer offset
     LD E,A
     LD D,0
     LD HL,ENEMY_FRAMES
@@ -555,6 +580,25 @@ GET_ENEMY_FRAME:
     LD E,(HL)
     INC HL
     LD D,(HL)
+    RET
+
+; OUT: DE=attribute source (1 byte small / 2 bytes large).
+; Keeps HL on the destination screen address; IX/BC preserved.
+GET_ENEMY_COLOUR:
+    PUSH HL
+    LD A,(IX+E_SHADE)
+    LD E,A
+    LD D,0
+    LD HL,ENEMY_SMALL_COLOURS
+    LD A,(IX+E_TYPE)
+    OR A
+    JR Z,.LOOKUP
+    SLA E                       ; large palette: two attributes/pair
+    LD HL,ENEMY_LARGE_COLOURS
+.LOOKUP:
+    ADD HL,DE
+    EX DE,HL
+    POP HL
     RET
 
 ; -------------------------------------------------------------
@@ -575,14 +619,13 @@ DRAW_ENEMY_ROW:
     POP AF
     PUSH AF
     PUSH HL
+    CALL GET_ENEMY_COLOUR
     LD A,(IX+E_TYPE)
     OR A
     JR NZ,.ATTR_WIDE
-    LD DE,ENEMY_ATTR_SMALL
     CALL RESTORE_ATTR_1_1
     JR .SPRITE
 .ATTR_WIDE:
-    LD DE,ENEMY_ATTR_LARGE
     CALL RESTORE_ATTR_1_2
 .SPRITE:
     POP HL
