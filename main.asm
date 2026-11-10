@@ -1,4 +1,4 @@
-; SpaceCan Step 19: 5 asteroids, 8 silhouettes, per-spawn shades.
+; SpaceCan Step 20: four separated asteroids, varied shapes/shades.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -30,10 +30,12 @@ SHIP_BANK_DELAY      EQU 5    ; ticks between 8x8 banking poses
 SHIP_BANK_HOLD       EQU 14   ; keep tilt after releasing O/P
 MAX_BULLETS          EQU 6
 BULLET_SLOT_SIZE     EQU 9
-MAX_ENEMIES          EQU 5
+MAX_ENEMIES          EQU 4
 ENEMY_SLOT_SIZE      EQU 15
 ENEMY_FRAME_DELAY    EQU 8     ; rotate once every 8 ticks
 ENEMY_RESPAWN_DELAY  EQU 24
+ENEMY_MIN_VERTICAL_GAP EQU 3 ; empty 8px rows between asteroids at spawn
+ENEMY_MIN_LANE_GAP EQU 1     ; preferred empty columns between asteroid lanes
 SHIP_BLAST_DURATION  EQU 5    ; 6 frames x 5 ticks = 0.6 sec
 SHIP_BLAST_FRAMES    EQU 6
 STATE_MENU           EQU 0

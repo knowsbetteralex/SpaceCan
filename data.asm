@@ -111,14 +111,14 @@ PAUSE_SAVED_ATTR:
 SHIP_MOVE_TIMER:
     DB 0                        ; frames until next horizontal step
 
-; Five independent falling objects. On EVERY spawn, lane/shape/shade
-; are freshly selected via LFSR. The initial table is TYPE,Y,PHASE.
+; Four asteroids start far apart vertically. Each new spawn chooses
+; another random lane/shape/shade. Initial table: TYPE,Y,PHASE.
+; At least 3 completely empty rows between sprite footprints.
 ENEMY_START_TABLE:
-    DB 0,4,1                    ; small 8x8
-    DB 1,8,3                    ; large 16x16
-    DB 0,12,5                   ; small 8x8
-    DB 1,16,7                   ; large 16x16
-    DB 0,20,2                   ; small 8x8
+    DB 0,4,1                    ; small, Y=4
+    DB 1,9,3                    ; large, Y=9..10
+    DB 0,14,5                   ; small, Y=14
+    DB 1,19,7                   ; large, Y=19..20
 
 ENEMY_MOVE_TIMER:
     DB 4
