@@ -100,6 +100,21 @@ MISS_KILLED_THIS_TICK:
     DB 0                        ; don't count the movement before a kill
 PRESSURE_LEVEL:
     DB 0                        ; 0..10, persistent red segments right-to-left
+BOSS_STARTED:         DB 0      ; boss phase reached this game
+BOSS_ACTIVE:          DB 0
+BOSS_HP:              DB 0      ; 10 HP shown by shared gauge
+BOSS_X:               DB BOSS_X_CENTER
+BOSS_Y:               DB BOSS_START_Y
+BOSS_DRAWN:           DB 0
+BOSS_DRAW_X:          DB BOSS_X_CENTER
+BOSS_DRAW_Y:          DB BOSS_START_Y
+BOSS_DIRTY:           DB 0
+BOSS_ENTRY_TIMER:     DB BOSS_ENTRY_DELAY
+BOSS_ANIM_TIMER:      DB BOSS_ANIM_DELAY
+BOSS_FRAME:           DB 0
+BOSS_FIRE_TIMER:      DB BOSS_FIRE_DELAY
+HOSTILE_BULLET_CLOCK: DB HOSTILE_MOVE_DELAY
+HOSTILE_BULLET_POOL:  DS MAX_HOSTILE_BULLETS*HOSTILE_BULLET_SIZE,0
 SHOOT_WARNING_ACTIVE:
     DB 0                        ; latch after >=20 travel rows; clear on kill/life
 SHOOT_VISIBLE:
