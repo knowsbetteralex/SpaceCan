@@ -3609,7 +3609,11 @@ CHECK_BULLET_BOSS:
     OR A
     JR Z,.MISS
 .HIT:
-    CALL BOSS_TAKE_HIT
+    ; The boss must reach the centre before its HP can be damaged.
+    ; Shots during entry hit the armour but do not reduce its gauge.
+    LD A,(BOSS_Y)
+    CP BOSS_TARGET_Y
+    CALL Z,BOSS_TAKE_HIT
     CALL DEACTIVATE_BULLET
     SCF
     RET
