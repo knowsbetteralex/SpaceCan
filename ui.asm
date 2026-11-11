@@ -262,6 +262,30 @@ DRAW_PRESSURE_BAR:
 ; Only 10 attribute writes per penalty. Green on the left,
 ; red grows from the RIGHT. Full red is shown during the blast.
 RENDER_PRESSURE_GAUGE:
+    LD A,(BOSS_STARTED)
+    OR A
+    JR Z,.PRESSURE
+    ; Boss HP repurposes the ten green/red penalty segments.
+    LD A,(BOSS_HP)
+    LD B,A
+    LD C,PRESSURE_SEGMENTS
+    LD HL,#5800+3*32+11
+.BOSS_NEXT:
+    LD A,C
+    CP B
+    JR C,.BOSS_ALIVE
+    JR Z,.BOSS_ALIVE
+    LD A,#42                     ; red = depleted boss health
+    JR .BOSS_STORE
+.BOSS_ALIVE:
+    LD A,#45                     ; bright cyan = remaining boss HP
+.BOSS_STORE:
+    LD (HL),A
+    INC HL
+    DEC C
+    JR NZ,.BOSS_NEXT
+    RET
+.PRESSURE:
     LD A,(PRESSURE_LEVEL)
     LD B,A
     LD C,PRESSURE_SEGMENTS
