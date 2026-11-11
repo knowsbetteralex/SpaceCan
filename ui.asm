@@ -1,5 +1,5 @@
 ; -------------------------------------------------------------
-; SpaceCan Step 12: six score digits in right window and four heart lives.
+; SpaceCan Step 21: HUD + blinking SHOOT! warning after 1 missed screen.
 ; RLE artwork is unpacked once; only HUD numerals/attributes change.
 ; -------------------------------------------------------------
 DRAW_STATIC_UI:
@@ -20,7 +20,11 @@ DRAW_STATIC_UI:
 
     ; Gauge at Y=3, X=11..20, centered over the corridor.
     ; Its bitmap is static; only the 10 attribute bytes change.
-    JP DRAW_PRESSURE_BAR
+    CALL DRAW_PRESSURE_BAR
+
+    ; Save original Y=2, X=13..18 pixels/attrs (between hearts and
+    ; gauge); flashing text must not destroy the .SCR decoration.
+    JP SAVE_SHOOT_BACKGROUND
 
 ; Decode RLE background directly into ZX bitmap and attributes.
 ; 00,count,value => repeat byte count times; nonzero => literal byte.
@@ -91,12 +95,113 @@ RENDER_HUD:
 .GAUGE:
     LD A,(GAUGE_DIRTY)
     OR A
-    RET Z
+    JR Z,.WARNING
     XOR A
     LD (GAUGE_DIRTY),A
-    JP RENDER_PRESSURE_GAUGE
+    CALL RENDER_PRESSURE_GAUGE
+.WARNING:
+    ; Called every active game frame, independent of HUD_DIRTY.
+    JP RENDER_SHOOT_WARNING
 
-; Draw four hearts in Y=2, X=14..17. Each slot index is compared
+; Warning between hearts (actual draw row Y=1) and gauge (Y=3).
+; No bitmap writes from IM2: blink in the foreground, paused game freezes.
+; OFF restores exact bitmap and attributes, rather than painting spaces.
+RENDER_SHOOT_WARNING:
+    LD A,(SHOOT_WARNING_ACTIVE)
+    OR A
+    JR Z,.HIDE
+    LD A,(GAME_STATE)
+    CP STATE_PLAYING
+    JR NZ,.HIDE
+    LD HL,SHOOT_BLINK_COUNTER
+    INC (HL)
+    LD A,(HL)
+    AND SHOOT_BLINK_MASK
+    JR NZ,.HIDE
+    LD A,(SHOOT_VISIBLE)
+    OR A
+    RET NZ                       ; no redraw on an unchanged blink frame
+    LD A,1
+    LD (SHOOT_VISIBLE),A
+    LD BC,SHOOT_TEXT_Y*256+SHOOT_TEXT_X
+    LD DE,HUD_LABEL_SHOOT
+    CALL PRINT_TEXT
+    LD HL,#5800+SHOOT_TEXT_Y*32+SHOOT_TEXT_X
+    LD B,SHOOT_TEXT_WIDTH
+    LD A,#46                     ; bright yellow on black
+.ATTR:
+    LD (HL),A
+    INC HL
+    DJNZ .ATTR
+    RET
+.HIDE:
+    LD A,(SHOOT_VISIBLE)
+    OR A
+    RET Z
+    XOR A
+    LD (SHOOT_VISIBLE),A
+    JP RESTORE_SHOOT_BACKGROUND
+
+; Capture the six cells directly from the original .SCR HUD.
+; Called every DRAW_STATIC_UI, including after respawn/Game Over.
+SAVE_SHOOT_BACKGROUND:
+    LD DE,SHOOT_SAVED_BITMAP
+    LD C,SHOOT_TEXT_X
+    LD A,SHOOT_TEXT_WIDTH
+.NEXT_CELL:
+    PUSH AF
+    PUSH BC
+    LD B,SHOOT_TEXT_Y
+    CALL GET_SCREEN_ADDR
+    LD B,8
+.NEXT_ROW:
+    LD A,(HL)
+    LD (DE),A
+    INC DE
+    INC H
+    DJNZ .NEXT_ROW
+    POP BC
+    INC C
+    POP AF
+    DEC A
+    JR NZ,.NEXT_CELL
+    LD HL,#5800+SHOOT_TEXT_Y*32+SHOOT_TEXT_X
+    LD DE,SHOOT_SAVED_ATTR
+    LD BC,SHOOT_TEXT_WIDTH
+    LDIR
+    XOR A
+    LD (SHOOT_VISIBLE),A
+    RET
+
+; Recover all original pixels/attrs underneath the word.
+RESTORE_SHOOT_BACKGROUND:
+    LD DE,SHOOT_SAVED_BITMAP
+    LD C,SHOOT_TEXT_X
+    LD A,SHOOT_TEXT_WIDTH
+.NEXT_CELL:
+    PUSH AF
+    PUSH BC
+    LD B,SHOOT_TEXT_Y
+    CALL GET_SCREEN_ADDR
+    LD B,8
+.NEXT_ROW:
+    LD A,(DE)
+    LD (HL),A
+    INC DE
+    INC H
+    DJNZ .NEXT_ROW
+    POP BC
+    INC C
+    POP AF
+    DEC A
+    JR NZ,.NEXT_CELL
+    LD HL,SHOOT_SAVED_ATTR
+    LD DE,#5800+SHOOT_TEXT_Y*32+SHOOT_TEXT_X
+    LD BC,SHOOT_TEXT_WIDTH
+    LDIR
+    RET
+
+; Draw four hearts in Y=1, X=14..17. Each slot index is compared
 ; to remaining SHIP_LIVES; lost lives remain visible as outlines.
 DRAW_LIVES_HEARTS:
     LD C,14

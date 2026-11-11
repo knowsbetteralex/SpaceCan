@@ -100,6 +100,16 @@ MISS_KILLED_THIS_TICK:
     DB 0                        ; don't count the movement before a kill
 PRESSURE_LEVEL:
     DB 0                        ; 0..10, persistent red segments right-to-left
+SHOOT_WARNING_ACTIVE:
+    DB 0                        ; latch after >=20 travel rows; clear on kill/life
+SHOOT_VISIBLE:
+    DB 0                        ; screen currently contains SHOOT! text
+SHOOT_BLINK_COUNTER:
+    DB 0                        ; increments only while warning/play active
+SHOOT_SAVED_BITMAP:
+    DS SHOOT_TEXT_WIDTH*8,0      ; original 48 HUD pixel bytes
+SHOOT_SAVED_ATTR:
+    DS SHOOT_TEXT_WIDTH,0        ; original six attributes
 PAUSE_KEY_HELD:
     DB 1                        ; ENTER edge latch (1 while entering game)
 PAUSE_PREVIOUS_STATE:
@@ -831,6 +841,7 @@ SPACE_HELD:        DB 0
 
 HUD_LABEL_TITLE:  DB "SPACECAN: SPACE SODA",0
 HUD_LABEL_SPEED:  DB "SPEED",0
+HUD_LABEL_SHOOT:  DB "SHOOT!",0
 
 ; Each life is one 8x8 character, active vs spent.
 HEART_FILLED:

@@ -1,4 +1,4 @@
-; SpaceCan Step 20: four separated asteroids, varied shapes/shades.
+; SpaceCan Step 21: blinking SHOOT! warning after one empty screen.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -23,6 +23,10 @@ SPEED_STAGE_COUNT    EQU 5     ; 1 / 1.5 / 2 / 2.5 / 3
 START_LIVES          EQU 4
 MISS_SCREEN_ROWS      EQU PLAYFIELD_BOTTOM-PLAYFIELD_TOP+1
 MISS_DISTANCE_LIMIT   EQU MISS_SCREEN_ROWS*3 ; 3 full corridor heights without kills
+SHOOT_TEXT_X          EQU 13    ; central HUD, below hearts and above gauge
+SHOOT_TEXT_Y          EQU 2
+SHOOT_TEXT_WIDTH      EQU 6     ; "SHOOT!"
+SHOOT_BLINK_MASK      EQU #10   ; 16 video frames on, 16 off
 PRESSURE_SEGMENTS     EQU 10    ; 10 penalties fill the gauge and cost a life
 GAME_OVER_FRAMES     EQU 50    ; ~1 second after the Game Over melody
 SHIP_MOVE_DELAY      EQU 2
@@ -107,6 +111,8 @@ START_NEW_GAME:
     LD (SPEED_LEVEL),A        ; 0..4, smooth half-speed stages
     LD (ENEMY_SPEED_PHASE),A
     LD (MISS_TRAVEL_ROWS),A       ; a new game resets travel since last kill
+    LD (SHOOT_WARNING_ACTIVE),A
+    LD (SHOOT_BLINK_COUNTER),A
     LD (PRESSURE_LEVEL),A        ; start with ten green segments
     LD A,1
     LD (SCROLL_SPEED),A
@@ -125,6 +131,8 @@ RESTART_ROUND:
     LD (PRESSURE_LEVEL),A
     LD (MISS_TRAVEL_ROWS),A
     LD (MISS_KILLED_THIS_TICK),A
+    LD (SHOOT_WARNING_ACTIVE),A
+    LD (SHOOT_BLINK_COUNTER),A
     CALL DRAW_STATIC_UI
     CALL RESET_ROUND_OBJECTS
     LD A,STATE_PLAYING

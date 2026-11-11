@@ -397,6 +397,14 @@ UPDATE_MISS_PRESSURE:
     LD HL,MISS_TRAVEL_ROWS
     INC (HL)
     LD A,(HL)
+    CP MISS_SCREEN_ROWS
+    JR NZ,.CHECK_PENALTY
+    ; One complete screen has passed without destroying an asteroid.
+    ; Warning stays active across the 3-screen penalty counter wrap.
+    LD A,1
+    LD (SHOOT_WARNING_ACTIVE),A
+    LD A,(HL)
+.CHECK_PENALTY:
     CP MISS_DISTANCE_LIMIT
     RET C                         ; fewer than 3 screens since last kill
     LD (HL),0                     ; begin the next 3-screen interval
@@ -425,6 +433,8 @@ UPDATE_MISS_PRESSURE:
 RESET_MISS_TRAVEL:
     XOR A
     LD (MISS_TRAVEL_ROWS),A
+    LD (SHOOT_WARNING_ACTIVE),A   ; next render restores original HUD
+    LD (SHOOT_BLINK_COUNTER),A
     INC A
     LD (MISS_KILLED_THIS_TICK),A
     RET
