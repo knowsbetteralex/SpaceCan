@@ -149,6 +149,10 @@ READ_FIRE_KEY:
 ; The logic always runs after render and works only with game state.
 ; Blast first: a new hit starts from full frame 0 duration.
 UPDATE_GAME:
+    LD A,(GAME_STATE)
+    CP STATE_BOSS
+    JP Z,UPDATE_BOSS_GAME
+
     XOR A
     LD (MISS_KILLED_THIS_TICK),A
     CALL UPDATE_BLAST_ANIM
@@ -167,7 +171,20 @@ UPDATE_GAME:
     CP STATE_PLAYING
     RET NZ
     CALL STARFIELD_UPDATE
-    RET
+    JP MAYBE_START_BOSS
+
+; Final boss has no asteroids and no missed-screen penalty.
+UPDATE_BOSS_GAME:
+    CALL UPDATE_BOSS
+    CALL UPDATE_HOSTILE_BULLETS
+    LD A,(GAME_STATE)
+    CP STATE_BOSS
+    RET NZ
+    CALL UPDATE_BULLETS
+    LD A,(GAME_STATE)
+    CP STATE_BOSS
+    RET NZ
+    JP STARFIELD_UPDATE
 
 ; Start an explosion at a destroyed asteroid (one effect slot).
 ; IN: IX = asteroid slot. PRESERVES: IX. DESTROYS: AF, DE, HL.

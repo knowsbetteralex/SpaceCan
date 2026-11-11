@@ -102,6 +102,10 @@ BULLET_STEP_ONE:
 
 ; Check moving enemies and absorb bullets entering an explosion.
 CHECK_BULLET_COLLISION:
+    CALL CHECK_BULLET_HOSTILES
+    RET C
+    CALL CHECK_BULLET_BOSS
+    RET C
     CALL CHECK_BULLET_ENEMIES
     RET C
     LD A,(BLAST_ACTIVE)

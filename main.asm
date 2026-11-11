@@ -1,4 +1,4 @@
-; SpaceCan Step 21: blinking SHOOT! warning after one empty screen.
+; SpaceCan Step 22: centered boss after max speed, twin cannons, final demo.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -35,6 +35,16 @@ SHIP_BANK_HOLD       EQU 14   ; keep tilt after releasing O/P
 MAX_BULLETS          EQU 6
 BULLET_SLOT_SIZE     EQU 9
 MAX_ENEMIES          EQU 4
+BOSS_MAX_HP          EQU PRESSURE_SEGMENTS
+BOSS_X_CENTER        EQU 14 ; 3 columns 14..16, centered
+BOSS_START_Y         EQU PLAYFIELD_TOP
+BOSS_TARGET_Y        EQU 12
+BOSS_ENTRY_DELAY     EQU 5
+BOSS_ANIM_DELAY      EQU 12
+BOSS_FIRE_DELAY      EQU 45
+MAX_HOSTILE_BULLETS  EQU 6
+HOSTILE_BULLET_SIZE  EQU 7
+HOSTILE_MOVE_DELAY   EQU 4
 ENEMY_SLOT_SIZE      EQU 15
 ENEMY_FRAME_DELAY    EQU 8     ; rotate once every 8 ticks
 ENEMY_RESPAWN_DELAY  EQU 24
@@ -48,6 +58,8 @@ STATE_EXPLODING      EQU 2
 STATE_RESPAWN        EQU 3
 STATE_GAME_OVER      EQU 4
 STATE_PAUSED         EQU 5
+STATE_BOSS           EQU 6
+STATE_VICTORY        EQU 7
 PAUSE_TEXT_Y         EQU 12
 PAUSE_TEXT_X         EQU 13
 PAUSE_TEXT_WIDTH     EQU 6
@@ -114,6 +126,8 @@ START_NEW_GAME:
     LD (SHOOT_WARNING_ACTIVE),A
     LD (SHOOT_BLINK_COUNTER),A
     LD (PRESSURE_LEVEL),A        ; start with ten green segments
+    LD (BOSS_STARTED),A
+    LD (BOSS_ACTIVE),A
     LD A,1
     LD (SCROLL_SPEED),A
     LD A,START_LIVES
@@ -135,6 +149,17 @@ RESTART_ROUND:
     LD (SHOOT_BLINK_COUNTER),A
     CALL DRAW_STATIC_UI
     CALL RESET_ROUND_OBJECTS
+    CALL RESET_HOSTILE_BULLETS
+    LD A,(BOSS_STARTED)
+    OR A
+    JR Z,.ASTEROID_ROUND
+    ; Resume boss after lost life, retaining its remaining HP.
+    CALL BOSS_RESET_ENTRY
+    JP MAIN_LOOP
+.ASTEROID_ROUND:
+    XOR A
+    LD (BOSS_ACTIVE),A
+    LD (BOSS_DRAWN),A
     LD A,STATE_PLAYING
     LD (GAME_STATE),A
     JP MAIN_LOOP
@@ -146,6 +171,8 @@ MAIN_LOOP:
     JP Z,RESTART_ROUND
     CP STATE_GAME_OVER
     JP Z,SHOW_GAME_OVER
+    CP STATE_VICTORY
+    JP Z,SHOW_VICTORY
 
     ; Pause scan runs before rendering and game logic. While paused,
     ; only HALT and ENTER are processed, so all animation clocks freeze.
@@ -161,7 +188,10 @@ MAIN_LOOP:
     DEBUG_PHASE DBG_INPUT_COLOUR
     LD A,(GAME_STATE)
     CP STATE_PLAYING
+    JR Z,.ACTIVE
+    CP STATE_BOSS
     JR NZ,.EXPLODING
+.ACTIVE:
     CALL READ_INPUT
     DEBUG_PHASE DBG_LOGIC_COLOUR
     CALL UPDATE_GAME
@@ -185,7 +215,9 @@ MAIN_LOOP:
     INCLUDE "music.asm"
     INCLUDE "logic.asm"
     INCLUDE "bullets.asm"
+    INCLUDE "hostile_bullets.asm"
     INCLUDE "enemies.asm"
+    INCLUDE "boss.asm"
     INCLUDE "starfield.asm"
     INCLUDE "renderer.asm"
     INCLUDE "graphics.asm"
