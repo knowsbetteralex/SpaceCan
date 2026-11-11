@@ -20,6 +20,12 @@ START_BOSS_PHASE:
     LD (BOSS_HP),A
     CALL BOSS_DISABLE_ASTEROIDS
     CALL RESET_HOSTILE_BULLETS
+    ; An asteroid killed at the score threshold may still be exploding.
+    ; Let the normal renderer erase its last frame before boss entry.
+    XOR A
+    LD (BLAST_ACTIVE),A
+    LD A,1
+    LD (BLAST_DIRTY),A
     XOR A
     LD (SHOOT_WARNING_ACTIVE),A
     LD (MISS_TRAVEL_ROWS),A
