@@ -18,7 +18,9 @@ RENDER_FRAME:
 
     ; Erase phase marks old footprints in the dirty-cell queue.
     CALL RENDER_ERASE_BULLETS
+    CALL RENDER_ERASE_HOSTILE_BULLETS
     CALL RENDER_ERASE_ENEMIES
+    CALL RENDER_ERASE_BOSS
 
     LD A,(SHIP_DIRTY)
     OR A
@@ -88,7 +90,9 @@ RENDER_FRAME:
     LD (SHIP_DRAWN),A
 .SHIP_DONE:
     CALL RENDER_DRAW_ENEMIES
+    CALL RENDER_DRAW_BOSS
     CALL RENDER_DRAW_BULLETS
+    CALL RENDER_DRAW_HOSTILE_BULLETS
 
     ; Final pass: OR star bits into the finished image, including
     ; asteroid pixels when a star happens to cross one.
