@@ -3997,8 +3997,8 @@ RENDER_SHOOT_WARNING:
     CP STATE_PLAYING
     JR NZ,.HIDE
     LD HL,SHOOT_BLINK_COUNTER
+    LD A,(HL)                    ; show 0..15, hide 16..31
     INC (HL)
-    LD A,(HL)
     AND SHOOT_BLINK_MASK
     JR NZ,.HIDE
     LD A,(SHOOT_VISIBLE)
