@@ -2400,9 +2400,11 @@ SPAWN_HOSTILE_BULLET:
     LD (IX+HB_DIRTY),A
     JR .DONE
 .NEXT:
-    ; BC still holds the requested YX position for a later free slot.
-    LD HL,HOSTILE_BULLET_SIZE
-    ADD IX,HL
+    ; Save requested YX in BC and retain D as the slot counter.
+    PUSH BC
+    LD BC,HOSTILE_BULLET_SIZE
+    ADD IX,BC
+    POP BC
     DEC D
     JR NZ,.FIND
 .DONE:
@@ -3651,8 +3653,10 @@ RENDER_ERASE_BOSS:
     LD A,(BOSS_DRAWN)
     OR A
     JR Z,.NEW
-    LD B,(BOSS_DRAW_Y)
-    LD C,(BOSS_DRAW_X)
+    LD A,(BOSS_DRAW_Y)
+    LD B,A
+    LD A,(BOSS_DRAW_X)
+    LD C,A
     LD DE,#0302
     CALL STARFIELD_MARK_RECT
     XOR A
@@ -3661,8 +3665,10 @@ RENDER_ERASE_BOSS:
     LD A,(BOSS_ACTIVE)
     OR A
     RET Z
-    LD B,(BOSS_Y)
-    LD C,(BOSS_X)
+    LD A,(BOSS_Y)
+    LD B,A
+    LD A,(BOSS_X)
+    LD C,A
     LD DE,#0302
     JP STARFIELD_MARK_RECT
 
@@ -3703,10 +3709,12 @@ RENDER_DRAW_BOSS:
 ; No special renderer: 3 direct bitmap writes x 8 scan lines.
 DRAW_BOSS_ROW:
     PUSH DE
-    LD B,(BOSS_Y)
+    LD B,A                        ; row offset 0 or 1
+    LD A,(BOSS_Y)
     ADD A,B
-    LD B,A
-    LD C,(BOSS_X)
+    LD B,A                        ; absolute screen Y
+    LD A,(BOSS_X)
+    LD C,A
     CALL GET_SCREEN_ADDR
     PUSH HL
     LD A,H
@@ -4106,8 +4114,10 @@ STARFIELD_INVALIDATE_FOREGROUND:
     LD A,(BOSS_DRAWN)
     OR A
     JR Z,.HOSTILE
-    LD B,(BOSS_DRAW_Y)
-    LD C,(BOSS_DRAW_X)
+    LD A,(BOSS_DRAW_Y)
+    LD B,A
+    LD A,(BOSS_DRAW_X)
+    LD C,A
     LD DE,#0302
     CALL STARFIELD_TEST_RECT
     OR A

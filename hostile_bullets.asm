@@ -42,9 +42,11 @@ SPAWN_HOSTILE_BULLET:
     LD (IX+HB_DIRTY),A
     JR .DONE
 .NEXT:
-    ; BC still holds the requested YX position for a later free slot.
-    LD HL,HOSTILE_BULLET_SIZE
-    ADD IX,HL
+    ; Save requested YX in BC and retain D as the slot counter.
+    PUSH BC
+    LD BC,HOSTILE_BULLET_SIZE
+    ADD IX,BC
+    POP BC
     DEC D
     JR NZ,.FIND
 .DONE:
