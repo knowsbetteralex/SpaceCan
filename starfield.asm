@@ -316,6 +316,41 @@ STARFIELD_INVALIDATE_FOREGROUND:
     LD DE,ENEMY_SLOT_SIZE
     ADD IX,DE
     DJNZ .NEXT_ENEMY
+
+    ; Invalidate stationary boss / hostile shots touched by stars.
+    LD A,(BOSS_DRAWN)
+    OR A
+    JR Z,.HOSTILE
+    LD B,(BOSS_DRAW_Y)
+    LD C,(BOSS_DRAW_X)
+    LD DE,#0302
+    CALL STARFIELD_TEST_RECT
+    OR A
+    JR Z,.HOSTILE
+    LD A,1
+    LD (BOSS_DIRTY),A
+
+.HOSTILE:
+    LD IX,HOSTILE_BULLET_POOL
+    LD B,MAX_HOSTILE_BULLETS
+.NEXT_HOSTILE:
+    PUSH BC
+    LD A,(IX+HB_DRAWN)
+    OR A
+    JR Z,.SKIP_HOSTILE
+    LD B,(IX+HB_DRAW_Y)
+    LD C,(IX+HB_DRAW_X)
+    LD DE,#0101
+    CALL STARFIELD_TEST_RECT
+    OR A
+    JR Z,.SKIP_HOSTILE
+    LD A,1
+    LD (IX+HB_DIRTY),A
+.SKIP_HOSTILE:
+    POP BC
+    LD DE,HOSTILE_BULLET_SIZE
+    ADD IX,DE
+    DJNZ .NEXT_HOSTILE
     RET
 
 ; Stage 1: clear changed cells BEFORE drawing sprites.
