@@ -2643,7 +2643,9 @@ HOSTILE_BULLET_SPRITE:
 ; vertical clearance; lane selection prefers horizontal clearance.
 ; -------------------------------------------------------------
 
-; Initialise from ENEMY_START_TABLE: TYPE, START_Y, ANIM_PHASE.
+; Initialise from ENEMY_START_TABLE: TYPE, ENTRY_Y, ANIM_PHASE, DELAY.
+; Delayed slots start INACTIVE and enter at the top of the corridor.
+; This is used on a new game and after every lost life.
 INIT_ENEMIES:
     ; Reset all slots, including DRAWN and DIRTY flags.
     LD HL,ENEMY_POOL
@@ -2677,6 +2679,13 @@ INIT_ENEMIES:
     LD (IX+E_ANIM_TIMER),A
     LD (IX+E_PHASE),A
     INC HL
+    ; Delay is in 50 Hz game frames; a delayed asteroid starts
+    ; inactive and uses the standard safe entry-spawn procedure.
+    LD A,(HL)
+    LD (IX+E_RESPAWN),A
+    INC HL
+    OR A
+    JR NZ,.SKIP_ACTIVE
 
     ; Every asteroid begins in a randomly selected vertical lane.
     ; Entry checks enforce vertical spacing; lane search keeps X varied.
@@ -2699,6 +2708,8 @@ INIT_ENEMIES:
     DJNZ .NEXT
     LD A,4
     LD (ENEMY_MOVE_TIMER),A
+    XOR A
+    LD (ENEMY_MOVE_NOW),A
     RET
 
 ; Smooth speed stages: asteroid motion intervals 4 / 4-3 / 3 / 3-2 / 2 ticks.
@@ -5162,14 +5173,16 @@ PAUSE_SAVED_ATTR:
 SHIP_MOVE_TIMER:
     DB 0                        ; frames until next horizontal step
 
-; Four asteroids start far apart vertically. Each new spawn chooses
-; another random lane/shape/shade. Initial table: TYPE,Y,PHASE.
-; At least 3 completely empty rows between sprite footprints.
+; On a new game OR after a ship explosion, all asteroids start
+; a fresh approach at the TOP, never next to the respawned ship.
+; TYPE, ENTRY_Y, ANIM_PHASE, START_DELAY (50 Hz game frames).
+; The first asteroid starts now; the other three join at intervals.
+; This keeps at least 3 empty rows between successive arrivals.
 ENEMY_START_TABLE:
-    DB 0,4,1                    ; small, Y=4
-    DB 1,9,3                    ; large, Y=9..10
-    DB 0,14,5                   ; small, Y=14
-    DB 1,19,7                   ; large, Y=19..20
+    DB 0,PLAYFIELD_TOP,1,0       ; small: immediate, Y=4
+    DB 1,PLAYFIELD_TOP,3,20      ; large: after 20 ticks, Y=4..5
+    DB 0,PLAYFIELD_TOP,5,40      ; small: after 40 ticks
+    DB 1,PLAYFIELD_TOP,7,60      ; large: after 60 ticks
 
 ENEMY_MOVE_TIMER:
     DB 4
