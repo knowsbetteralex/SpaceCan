@@ -8,7 +8,7 @@
 ; recalculates the notes contained in these binary resources.
 ; -------------------------------------------------------------
 
-IF AY_MUSIC_ENABLED
+    IF AY_MUSIC_ENABLED
 AY_MUSIC_TITLE:
     INCBIN "assets/music/title.aym"
 
@@ -17,4 +17,4 @@ AY_MUSIC_GAME:
 
 AY_MUSIC_GAME_OVER:
     INCBIN "assets/music/game_over.aym"
-ENDIF
+    ENDIF
