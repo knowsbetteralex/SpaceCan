@@ -30,9 +30,9 @@ SPEED_STAGE_COUNT    EQU 5     ; engine supports 1 / 1.5 / 2 / 2.5 / 3
 ; =============================================================
 DEMO_SPEEDUP_SCORE   EQU 4096
 DEMO_BOSS_SCORE      EQU 8192
-ASSERT DEMO_SPEEDUP_SCORE >= 0
-ASSERT DEMO_SPEEDUP_SCORE < DEMO_BOSS_SCORE
-ASSERT DEMO_BOSS_SCORE <= 999999
+    ASSERT DEMO_SPEEDUP_SCORE >= 0
+    ASSERT DEMO_SPEEDUP_SCORE < DEMO_BOSS_SCORE
+    ASSERT DEMO_BOSS_SCORE <= 999999
 
 START_LIVES          EQU 4
 MISS_SCREEN_ROWS      EQU PLAYFIELD_BOTTOM-PLAYFIELD_TOP+1
@@ -113,13 +113,13 @@ DBG_INPUT_COLOUR  EQU 5  ; cyan: keyboard
 DBG_LOGIC_COLOUR  EQU 4  ; green: game update
 DBG_IDLE_COLOUR   EQU 1  ; blue: remainder of frame / HALT
 
-MACRO DEBUG_PHASE colour
+    MACRO DEBUG_PHASE colour
     IF DEBUG_BORDER
         LD A,colour
         LD (SFX_FE_BASE),A
         OUT (#FE),A
     ENDIF
-ENDM
+    ENDM
 
 
 ; Each bullet slot is 9 bytes; current/drawn half-cell offsets differ.
@@ -1109,20 +1109,20 @@ DUR_SIXTEENTH_TRIPLET EQU 4
 ; 32-bit assembler arithmetic, then multiply by musical duration.
 ; Note encoding uses a 16-bit cycle count, so long notes no longer
 ; suffer the former 255-cycle limit.
-MACRO MELODY_NOTE pitch, duration, tempo
+    MACRO MELODY_NOTE pitch, duration, tempo
     DB pitch
     DW ((MELODY_CPU_HZ / (54 + 32*(pitch))) * 60 * (duration) + ((tempo)*MELODY_UNITS_BEAT/2)) / ((tempo)*MELODY_UNITS_BEAT)
-ENDM
+    ENDM
 
 ; A rest is counted in whole 50Hz frames; timing precision is 20ms.
-MACRO MELODY_REST duration, tempo
+    MACRO MELODY_REST duration, tempo
     DB 0
     DW (MELODY_FRAME_HZ * 60 * (duration) + ((tempo)*MELODY_UNITS_BEAT/2)) / ((tempo)*MELODY_UNITS_BEAT)
-ENDM
+    ENDM
 
-MACRO MELODY_END
+    MACRO MELODY_END
     DB 0,0,0
-ENDM
+    ENDM
 
 ; IN HL = 3-byte melody stream. OUT no defined registers.
 ; Preserves IX. Uses foreground beeper only outside active play:
@@ -1633,7 +1633,7 @@ AY_SHADOW:       DS 14,0
 ; recalculates the notes contained in these binary resources.
 ; -------------------------------------------------------------
 
-IF AY_MUSIC_ENABLED
+    IF AY_MUSIC_ENABLED
 AY_MUSIC_TITLE:
     INCBIN "assets/music/title.aym"
 
@@ -1642,7 +1642,7 @@ AY_MUSIC_GAME:
 
 AY_MUSIC_GAME_OVER:
     INCBIN "assets/music/game_over.aym"
-ENDIF
+    ENDIF
 
 ; ===== logic.asm =====
 ; -------------------------------------------------------------
