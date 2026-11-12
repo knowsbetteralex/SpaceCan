@@ -41,6 +41,14 @@ jobs:
           python3 make_tap.py dist/SpaceCan.bin dist/SpaceCan.tap
           test -s dist/SpaceCan.tap
 
+      - name: Save downloadable TAP as an Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpaceCan-TAP-${{ github.run_number }}
+          path: dist/SpaceCan.tap
+          retention-days: 90
+          if-no-files-found: error
+
       - name: Check whether this is still the latest main commit
         id: current
         shell: bash
@@ -54,7 +62,9 @@ jobs:
           fi
 
       - name: Publish new GitHub release
+        id: release
         if: steps.current.outputs.publish == 'true'
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           tag_name: demo-${{ github.run_number }}
@@ -66,3 +76,9 @@ jobs:
           body_path: docs/release_notes.md
           files: dist/SpaceCan.tap
           fail_on_unmatched_files: true
+
+      - name: Explain release permission failure
+        if: steps.release.outcome == 'failure'
+        run: |
+          echo "::warning::GitHub rejected Release publication. Download SpaceCan.tap from this workflow's Artifacts instead."
+          echo "The source builds correctly; creating Releases requires enabling the appropriate repository permission or token."
