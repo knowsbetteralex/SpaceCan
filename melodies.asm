@@ -45,20 +45,20 @@ DUR_SIXTEENTH_TRIPLET EQU 4
 ; 32-bit assembler arithmetic, then multiply by musical duration.
 ; Note encoding uses a 16-bit cycle count, so long notes no longer
 ; suffer the former 255-cycle limit.
-MACRO MELODY_NOTE pitch, duration, tempo
+    MACRO MELODY_NOTE pitch, duration, tempo
     DB pitch
     DW ((MELODY_CPU_HZ / (54 + 32*(pitch))) * 60 * (duration) + ((tempo)*MELODY_UNITS_BEAT/2)) / ((tempo)*MELODY_UNITS_BEAT)
-ENDM
+    ENDM
 
 ; A rest is counted in whole 50Hz frames; timing precision is 20ms.
-MACRO MELODY_REST duration, tempo
+    MACRO MELODY_REST duration, tempo
     DB 0
     DW (MELODY_FRAME_HZ * 60 * (duration) + ((tempo)*MELODY_UNITS_BEAT/2)) / ((tempo)*MELODY_UNITS_BEAT)
-ENDM
+    ENDM
 
-MACRO MELODY_END
+    MACRO MELODY_END
     DB 0,0,0
-ENDM
+    ENDM
 
 ; IN HL = 3-byte melody stream. OUT no defined registers.
 ; Preserves IX. Uses foreground beeper only outside active play:
