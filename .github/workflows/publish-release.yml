@@ -16,10 +16,6 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: spacecan-release-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   publish:
     runs-on: ubuntu-24.04
@@ -45,7 +41,20 @@ jobs:
           python3 make_tap.py dist/SpaceCan.bin dist/SpaceCan.tap
           test -s dist/SpaceCan.tap
 
+      - name: Check whether this is still the latest main commit
+        id: current
+        shell: bash
+        run: |
+          remote_sha="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [[ "$remote_sha" == "$GITHUB_SHA" ]]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Newer main commit exists; skipping stale release."
+          fi
+
       - name: Publish new GitHub release
+        if: steps.current.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: demo-${{ github.run_number }}
