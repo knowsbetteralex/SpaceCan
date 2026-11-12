@@ -9,7 +9,9 @@
 ; vertical clearance; lane selection prefers horizontal clearance.
 ; -------------------------------------------------------------
 
-; Initialise from ENEMY_START_TABLE: TYPE, START_Y, ANIM_PHASE.
+; Initialise from ENEMY_START_TABLE: TYPE, ENTRY_Y, ANIM_PHASE, DELAY.
+; Delayed slots start INACTIVE and enter at the top of the corridor.
+; This is used on a new game and after every lost life.
 INIT_ENEMIES:
     ; Reset all slots, including DRAWN and DIRTY flags.
     LD HL,ENEMY_POOL
@@ -43,6 +45,13 @@ INIT_ENEMIES:
     LD (IX+E_ANIM_TIMER),A
     LD (IX+E_PHASE),A
     INC HL
+    ; Delay is in 50 Hz game frames; a delayed asteroid starts
+    ; inactive and uses the standard safe entry-spawn procedure.
+    LD A,(HL)
+    LD (IX+E_RESPAWN),A
+    INC HL
+    OR A
+    JR NZ,.SKIP_ACTIVE
 
     ; Every asteroid begins in a randomly selected vertical lane.
     ; Entry checks enforce vertical spacing; lane search keeps X varied.
@@ -65,6 +74,8 @@ INIT_ENEMIES:
     DJNZ .NEXT
     LD A,4
     LD (ENEMY_MOVE_TIMER),A
+    XOR A
+    LD (ENEMY_MOVE_NOW),A
     RET
 
 ; Smooth speed stages: asteroid motion intervals 4 / 4-3 / 3 / 3-2 / 2 ticks.
