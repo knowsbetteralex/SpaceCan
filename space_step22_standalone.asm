@@ -1,5 +1,5 @@
-; ===== SpaceCan Step 22: boss encounter, 4 asteroids, IM2, external AYM1 =====
-; SpaceCan Step 22: centered boss after max speed, twin cannons, final demo.
+; ===== SpaceCan Step 22: demo 2x at 4096, boss at 8192 =====
+; SpaceCan Step 22: short demo progression (2x at 4096; boss at 8192).
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -20,7 +20,20 @@ PLAYFIELD_RIGHT      EQU 23
 PLAYFIELD_WIDTH      EQU 16
 PLAYFIELD_BOTTOM     EQU 23
 MAX_SCROLL_SPEED     EQU 3
-SPEED_STAGE_COUNT    EQU 5     ; 1 / 1.5 / 2 / 2.5 / 3
+SPEED_STAGE_COUNT    EQU 5     ; engine supports 1 / 1.5 / 2 / 2.5 / 3
+
+; =============================================================
+; DEMO PROGRESSION: EDIT THE TWO SCORE LIMITS HERE.
+; 0..4095 = speed 1x; from 4096 = speed 2x; from 8192 = boss.
+; SCORE is 24-bit, so both limits can be set as high as 999999.
+; The demo skips intermediate 1.5x / 2.5x / 3x stages.
+; =============================================================
+DEMO_SPEEDUP_SCORE   EQU 4096
+DEMO_BOSS_SCORE      EQU 8192
+ASSERT DEMO_SPEEDUP_SCORE >= 0
+ASSERT DEMO_SPEEDUP_SCORE < DEMO_BOSS_SCORE
+ASSERT DEMO_BOSS_SCORE <= 999999
+
 START_LIVES          EQU 4
 MISS_SCREEN_ROWS      EQU PLAYFIELD_BOTTOM-PLAYFIELD_TOP+1
 MISS_DISTANCE_LIMIT   EQU MISS_SCREEN_ROWS*3 ; 3 full corridor heights without kills
@@ -145,7 +158,7 @@ START_NEW_GAME:
     LD (SCORE),A
     LD (SCORE+1),A
     LD (SCORE+2),A             ; 24-bit score, up to 999999
-    LD (SPEED_LEVEL),A        ; 0..4, smooth half-speed stages
+    LD (SPEED_LEVEL),A        ; demo: stage 0 (1x), then stage 2 (2x)
     LD (ENEMY_SPEED_PHASE),A
     LD (MISS_TRAVEL_ROWS),A       ; a new game resets travel since last kill
     LD (SHOOT_WARNING_ACTIVE),A
@@ -1991,43 +2004,43 @@ ADD_SCORE_A:
     LD (HUD_DIRTY),A
     JP CHECK_SCORE_BONUS
 
-; Thresholds align to #1000/#2000/#4000/#8000.
+; Demo only: jump from stage 0 (1x) straight to stage 2 (2x).
+; Both score limits are defined near the top of main.asm.
 CHECK_SCORE_BONUS:
-    LD A,(SCORE+2)
-    OR A
-    JR NZ,.STAGE_4
-    LD A,(SCORE+1)
-    CP #80
-    JR NC,.STAGE_4
-    CP #40
-    JR NC,.STAGE_3
-    CP #20
-    JR NC,.STAGE_2
-    CP #10
-    JR NC,.STAGE_1
-    XOR A
-    JR .STORE
-.STAGE_1:
-    LD A,1
-    JR .STORE
-.STAGE_2:
-    LD A,2
-    JR .STORE
-.STAGE_3:
-    LD A,3
-    JR .STORE
-.STAGE_4:
-    LD A,4
+    LD DE,DEMO_SPEEDUP_SCORE & #FFFF
+    LD A,DEMO_SPEEDUP_SCORE >> 16
+    CALL SCORE_AT_LEAST
+    LD A,0                        ; before threshold: 1x
+    JR C,.STORE
+    LD A,2                        ; reached threshold: 2x
 .STORE:
     LD HL,SPEED_LEVEL
     CP (HL)
     RET Z
     LD (HL),A
-    SRL A                       ; stage 0..4 => 0,0,1,1,2
-    INC A                       ; integer portion 1..3
+    SRL A                         ; stages 0/2 -> integer 1/2
+    INC A
     LD (SCROLL_SPEED),A
     LD A,1
     LD (HUD_DIRTY),A
+    RET
+
+; Generic 24-bit score comparison, shared with the boss trigger.
+; IN: A=high threshold byte, DE=low 16 bits of threshold.
+; OUT: Carry=1 when SCORE<threshold; Carry=0 otherwise.
+; DESTROYS AF,HL; preserves BC,DE and IX/IY.
+SCORE_AT_LEAST:
+    LD H,A
+    LD A,(SCORE+2)
+    CP H
+    RET C
+    JR NZ,.REACHED
+    LD HL,(SCORE)
+    OR A                          ; clear carry before 16-bit subtract
+    SBC HL,DE
+    RET
+.REACHED:
+    OR A                          ; SCORE high byte exceeds threshold
     RET
 
 ; -------------------------------------------------------------
@@ -3454,7 +3467,7 @@ ERASE_ENEMY_SLOT:
 
 ; ===== boss.asm =====
 ; -------------------------------------------------------------
-; SpaceCan Step 22: centered 3x2 boss after full scroll speed.
+; SpaceCan Step 22: centered 3x2 demo boss at DEMO_BOSS_SCORE.
 ; Its separate state survives a lost player life; the current boss
 ; battle is the DEMO END. Future shooters will precede this battle.
 ; -------------------------------------------------------------
@@ -3463,9 +3476,10 @@ MAYBE_START_BOSS:
     LD A,(BOSS_STARTED)
     OR A
     RET NZ
-    LD A,(SPEED_LEVEL)
-    CP SPEED_STAGE_COUNT-1        ; maximum stage, score 32768
-    RET NZ
+    LD DE,DEMO_BOSS_SCORE & #FFFF
+    LD A,DEMO_BOSS_SCORE >> 16
+    CALL SCORE_AT_LEAST
+    RET C                          ; before configured score threshold
     JP START_BOSS_PHASE
 
 START_BOSS_PHASE:
