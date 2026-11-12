@@ -14,10 +14,10 @@ DBG_INPUT_COLOUR  EQU 5  ; cyan: keyboard
 DBG_LOGIC_COLOUR  EQU 4  ; green: game update
 DBG_IDLE_COLOUR   EQU 1  ; blue: remainder of frame / HALT
 
-MACRO DEBUG_PHASE colour
+    MACRO DEBUG_PHASE colour
     IF DEBUG_BORDER
         LD A,colour
         LD (SFX_FE_BASE),A
         OUT (#FE),A
     ENDIF
-ENDM
+    ENDM
