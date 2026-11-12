@@ -49,7 +49,7 @@ class RespawnInvariants(unittest.TestCase):
             r"\s+JR NZ,\.NEXT_MODE\s+LD A,STATE_GAME_OVER",
         )
         self.assertIsNotNone(re.search(
-            r"UPDATE_ENEMY_SLOT:.*?LD A,\\(GAME_STATE\\)\\s+CP STATE_PLAYING\\s+RET NZ",
+            r"UPDATE_ENEMY_SLOT:.*?LD A,\(GAME_STATE\)\s+CP STATE_PLAYING\s+RET NZ",
             source("enemies.asm"), re.S,
         ))
 
@@ -93,9 +93,9 @@ class RespawnInvariants(unittest.TestCase):
         update = routine(source("enemies.asm"), "UPDATE_ENEMY_SLOT",
                          "SELECT_ENEMY_SPAWN_X")
         self.assertIsNotNone(re.search(
-            r"\\.INACTIVE:.*?LD A,\\(IX\\+E_RESPAWN\\)"
-            r".*?DEC A.*?LD \\(IX\\+E_RESPAWN\\),A\\s+RET NZ"
-            r".*?\\.RESPAWN:.*?LD A,PLAYFIELD_TOP\\s+LD \\(IX\\+E_Y\\),A",
+            r"\.INACTIVE:.*?LD A,\(IX\+E_RESPAWN\)"
+            r".*?DEC A.*?LD \(IX\+E_RESPAWN\),A\s+RET NZ"
+            r".*?\.RESPAWN:.*?LD A,PLAYFIELD_TOP\s+LD \(IX\+E_Y\),A",
             update, re.S,
         ))
         self.assertIn("CALL ENEMY_SPAWN_GAP_CLEAR", update)
