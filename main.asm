@@ -1,4 +1,4 @@
-; SpaceCan Step 22: centered boss after max speed, twin cannons, final demo.
+; SpaceCan Step 22: short demo progression (2x at 4096; boss at 8192).
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -19,7 +19,20 @@ PLAYFIELD_RIGHT      EQU 23
 PLAYFIELD_WIDTH      EQU 16
 PLAYFIELD_BOTTOM     EQU 23
 MAX_SCROLL_SPEED     EQU 3
-SPEED_STAGE_COUNT    EQU 5     ; 1 / 1.5 / 2 / 2.5 / 3
+SPEED_STAGE_COUNT    EQU 5     ; engine supports 1 / 1.5 / 2 / 2.5 / 3
+
+; =============================================================
+; DEMO PROGRESSION: EDIT THE TWO SCORE LIMITS HERE.
+; 0..4095 = speed 1x; from 4096 = speed 2x; from 8192 = boss.
+; SCORE is 24-bit, so both limits can be set as high as 999999.
+; The demo skips intermediate 1.5x / 2.5x / 3x stages.
+; =============================================================
+DEMO_SPEEDUP_SCORE   EQU 4096
+DEMO_BOSS_SCORE      EQU 8192
+ASSERT DEMO_SPEEDUP_SCORE >= 0
+ASSERT DEMO_SPEEDUP_SCORE < DEMO_BOSS_SCORE
+ASSERT DEMO_BOSS_SCORE <= 999999
+
 START_LIVES          EQU 4
 MISS_SCREEN_ROWS      EQU PLAYFIELD_BOTTOM-PLAYFIELD_TOP+1
 MISS_DISTANCE_LIMIT   EQU MISS_SCREEN_ROWS*3 ; 3 full corridor heights without kills
@@ -120,7 +133,7 @@ START_NEW_GAME:
     LD (SCORE),A
     LD (SCORE+1),A
     LD (SCORE+2),A             ; 24-bit score, up to 999999
-    LD (SPEED_LEVEL),A        ; 0..4, smooth half-speed stages
+    LD (SPEED_LEVEL),A        ; demo: stage 0 (1x), then stage 2 (2x)
     LD (ENEMY_SPEED_PHASE),A
     LD (MISS_TRAVEL_ROWS),A       ; a new game resets travel since last kill
     LD (SHOOT_WARNING_ACTIVE),A
