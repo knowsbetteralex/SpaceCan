@@ -1,0 +1,59 @@
+name: Build and publish SpaceCan TAP
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "**/*.asm"
+      - "assets/music/*.aym"
+      - "make_tap.py"
+      - "tests/test_make_tap.py"
+      - "docs/release_notes.md"
+      - ".github/workflows/publish-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: spacecan-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build sjasmplus v1.22.0
+        shell: bash
+        run: |
+          git clone --depth 1 --branch v1.22.0 https://github.com/z00m128/sjasmplus.git "$RUNNER_TEMP/sjasmplus"
+          make -C "$RUNNER_TEMP/sjasmplus" -j2 USE_LUA=0
+          echo "$RUNNER_TEMP/sjasmplus" >> "$GITHUB_PATH"
+
+      - name: Run TAP packing tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Assemble game and package self-starting TAP
+        shell: bash
+        run: |
+          mkdir -p dist
+          sjasmplus --nologo --raw=dist/SpaceCan.bin main.asm
+          python3 make_tap.py dist/SpaceCan.bin dist/SpaceCan.tap
+          test -s dist/SpaceCan.tap
+
+      - name: Publish new GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: demo-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: SpaceCan demo · build ${{ github.run_number }}
+          make_latest: true
+          draft: false
+          prerelease: false
+          body_path: docs/release_notes.md
+          files: dist/SpaceCan.tap
+          fail_on_unmatched_files: true
