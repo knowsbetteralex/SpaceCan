@@ -7,9 +7,27 @@
 
     ORG #9000
 
-; Set 0 to skip AY access; beeper title intro plays in both modes.
-AY_MUSIC_ENABLED EQU 1
-AY_TARGET_CLOCK EQU 2000000    ; Delta-C AY board, check real oscillator
+; -------------------------------------------------------------
+; AUDIO SWITCHES: independent compile-time flags (0=OFF, 1=ON).
+; Both enabled in the experimental demo, one common TAP build.
+; Beeper shots/explosions always work, regardless of both flags.
+; -------------------------------------------------------------
+AY_MUSIC_ENABLED      EQU 1    ; AY soundtrack in IM2 (needs AY board)
+BEEPER_ENGINE_ENABLED EQU 1    ; idle engine buzz on #FE during flight
+AY_TARGET_CLOCK       EQU 2000000 ; Delta-C AY oscillator
+
+; BEEPER ENGINE TUNING (only used when BEEPER_ENGINE_ENABLED=1):
+; Larger period = lower buzz; higher pulse count = denser sound
+; but consumes more CPU each 20 ms frame. Keep PERIOD 1..247.
+BEEPER_ENGINE_PERIOD_1X EQU 96
+BEEPER_ENGINE_PERIOD_2X EQU 72
+BEEPER_ENGINE_PULSES    EQU 2
+    ASSERT BEEPER_ENGINE_PERIOD_1X >= 1
+    ASSERT BEEPER_ENGINE_PERIOD_1X <= 247
+    ASSERT BEEPER_ENGINE_PERIOD_2X >= 1
+    ASSERT BEEPER_ENGINE_PERIOD_2X <= 247
+    ASSERT BEEPER_ENGINE_PULSES >= 1
+    ASSERT BEEPER_ENGINE_PULSES <= 8
 
 BLAST_FRAME_DURATION EQU 4
 BLAST_FRAME_COUNT    EQU 4
@@ -214,8 +232,9 @@ MAIN_LOOP:
     DEBUG_PHASE DBG_LOGIC_COLOUR
     CALL UPDATE_BLAST_ANIM
 .FRAME_SOUND:
-    ; AY_TICK is IRQ-driven now; only beeper SFX remains here.
-    CALL SFX_TICK                  ; bounded short pulse; skip on PAUSED
+    ; AY_TICK remains IM2-driven. The foreground beeper outputs a
+    ; short engine packet only when no higher-priority SFX is active.
+    CALL SFX_TICK                  ; silent on pause/menu/after explosion
 .FRAME_END:
     DEBUG_PHASE DBG_IDLE_COLOUR
     JR MAIN_LOOP

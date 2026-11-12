@@ -8,9 +8,27 @@
 
     ORG #9000
 
-; Set 0 to skip AY access; beeper title intro plays in both modes.
-AY_MUSIC_ENABLED EQU 1
-AY_TARGET_CLOCK EQU 2000000    ; Delta-C AY board, check real oscillator
+; -------------------------------------------------------------
+; AUDIO SWITCHES: independent compile-time flags (0=OFF, 1=ON).
+; Both enabled in the experimental demo, one common TAP build.
+; Beeper shots/explosions always work, regardless of both flags.
+; -------------------------------------------------------------
+AY_MUSIC_ENABLED      EQU 1    ; AY soundtrack in IM2 (needs AY board)
+BEEPER_ENGINE_ENABLED EQU 1    ; idle engine buzz on #FE during flight
+AY_TARGET_CLOCK       EQU 2000000 ; Delta-C AY oscillator
+
+; BEEPER ENGINE TUNING (only used when BEEPER_ENGINE_ENABLED=1):
+; Larger period = lower buzz; higher pulse count = denser sound
+; but consumes more CPU each 20 ms frame. Keep PERIOD 1..247.
+BEEPER_ENGINE_PERIOD_1X EQU 96
+BEEPER_ENGINE_PERIOD_2X EQU 72
+BEEPER_ENGINE_PULSES    EQU 2
+    ASSERT BEEPER_ENGINE_PERIOD_1X >= 1
+    ASSERT BEEPER_ENGINE_PERIOD_1X <= 247
+    ASSERT BEEPER_ENGINE_PERIOD_2X >= 1
+    ASSERT BEEPER_ENGINE_PERIOD_2X <= 247
+    ASSERT BEEPER_ENGINE_PULSES >= 1
+    ASSERT BEEPER_ENGINE_PULSES <= 8
 
 BLAST_FRAME_DURATION EQU 4
 BLAST_FRAME_COUNT    EQU 4
@@ -827,11 +845,12 @@ MENU_GLYPH_N:
 
 ; ===== sfx.asm =====
 ; -------------------------------------------------------------
-; SpaceCan Step 15.1 — deeper, noise-based ship blast on ZX #FE.
-; No AY access here: three AY voices remain free for future music.
+; SpaceCan: short priority SFX + optional idle engine on ZX #FE.
+; No AY access here: AY music may play at the same time.
 ;
 ; SFX_START: A=1..5. Clobbers AF,DE,HL, preserves BC/IX.
-; SFX_TICK:  one bounded burst/frame; clobbers AF,BC,DE,HL.
+; SFX_TICK: one bounded SFX or engine packet/frame; clobbers AF,BC,DE,HL.
+; When no SFX is active, optional engine buzz is heard in PLAYING/BOSS.
 ; Ship explosion uses a dedicated irregular pulse routine.
 ; SFX_STOP:  silence immediately, preserving border (clobbers AF).
 ; Priority: SHIP > PENALTY > KILL > HIT > SHOT.
@@ -873,6 +892,9 @@ SFX_STOP:
     XOR A
     LD (SFX_ACTIVE),A
     LD (SFX_FRAMES),A
+    IF BEEPER_ENGINE_ENABLED
+        LD (SFX_ENGINE_PHASE),A
+    ENDIF
     LD A,(SFX_FE_BASE)
     AND #0F
     OUT (#FE),A
@@ -884,7 +906,13 @@ SFX_STOP:
 SFX_TICK:
     LD A,(SFX_ACTIVE)
     OR A
-    RET Z
+    JR NZ,.SFX
+    IF BEEPER_ENGINE_ENABLED
+        JP SFX_ENGINE_TICK        ; lowest priority: idle engine hum
+    ELSE
+        RET
+    ENDIF
+.SFX:
     CP SFX_SHIP
     JP Z,SFX_SHIP_TICK            ; low irregular noise, not tonal sweep
 
@@ -1060,6 +1088,76 @@ SFX_PERIOD:  DB 0
 SFX_SWEEP:   DB 0
 SFX_NOISE:   DB #A5
 SFX_FE_BASE: DB 1                  ; shadow: border/MIC only, no EAR
+
+; -------------------------------------------------------------
+; Optional idle engine: AM-gated, slightly detuned square-wave
+; packets on ZX #FE. The 50 Hz packet repetition creates a low
+; buzzing/rumbling texture; it is NOT continuous audio synthesis.
+; SFX always takes priority: no engine output during shots/blasts.
+; Enabled only in STATE_PLAYING or STATE_BOSS, never while paused,
+; exploding, in the menu or on Game Over.
+;
+; Two repeats of each half-wave delay lower the carrier frequency.
+; PERIOD_1X=96 / PERIOD_2X=72 and 2 pulses give roughly 3–4 ms
+; of busy-wait/frame at 3.5MHz (tune after testing on real hardware).
+; DI/EI keeps each EAR pulse atomic versus IM2; AY still plays via
+; its interrupt outside this short packet. End with EAR low.
+; -------------------------------------------------------------
+    IF BEEPER_ENGINE_ENABLED
+SFX_ENGINE_TICK:
+    LD A,(GAME_STATE)
+    CP STATE_PLAYING
+    JR Z,.FLYING
+    CP STATE_BOSS
+    RET NZ
+.FLYING:
+    LD HL,SFX_ENGINE_PHASE
+    INC (HL)
+    LD A,(HL)
+    AND 7                         ; small 0..7 pitch jitter
+    LD E,A
+    LD A,(SCROLL_SPEED)
+    CP 2
+    LD A,BEEPER_ENGINE_PERIOD_1X
+    JR C,.SET_PERIOD
+    LD A,BEEPER_ENGINE_PERIOD_2X ; higher pitch at 2x speed
+.SET_PERIOD:
+    ADD A,E
+    LD C,A
+    LD B,BEEPER_ENGINE_PULSES
+    DI
+    LD A,(SFX_FE_BASE)
+    AND #0F                       ; preserve border + MIC
+    LD D,A                        ; EAR low
+    OR #10
+    LD E,A                        ; EAR high
+.PULSE:
+    LD A,E
+    OUT (#FE),A
+    LD A,C
+.HIGH_1:
+    DEC A
+    JR NZ,.HIGH_1
+    LD A,C
+.HIGH_2:
+    DEC A
+    JR NZ,.HIGH_2
+    LD A,D
+    OUT (#FE),A
+    LD A,C
+.LOW_1:
+    DEC A
+    JR NZ,.LOW_1
+    LD A,C
+.LOW_2:
+    DEC A
+    JR NZ,.LOW_2
+    DJNZ .PULSE
+    EI                            ; interrupt source continues AY playback
+    RET
+
+SFX_ENGINE_PHASE: DB 0            ; flutter phase, reset on SFX_STOP
+    ENDIF
 
 ; ===== melodies.asm =====
 ; -------------------------------------------------------------

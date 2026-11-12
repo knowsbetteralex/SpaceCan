@@ -6,6 +6,8 @@
 
 ### Что изменилось / What's new
 
+- **Два переключателя звука включены:** AY-музыка и пробное низкое жужжание двигателя на бипере; биперные выстрелы/взрывы имеют приоритет / **Both audio switches enabled:** AY music plus experimental beeper engine buzz; shots and explosions take priority.
+- Один TAP для тестирования; тембр регулируется в `main.asm` / One TAP for testing; adjust the engine tone in `main.asm`.
 - Ускорение **2× после 4 096 очков**, финальный босс после **8 192** / 2× speed at 4,096 points; boss at 8,192.
 - При потере жизни астероиды начинают полёт **сверху**, выходят по очереди / After respawn, all asteroids re-enter from the top in staggered waves.
 - Босс 24×16 с двумя пушками, 10 HP на индикаторе и экраном победы / 24×16 twin-cannon boss, 10-segment HP meter and victory screen.

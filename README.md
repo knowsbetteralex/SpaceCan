@@ -10,7 +10,7 @@
 
 **SpaceCan** — космическая аркада для **ZX Spectrum 48K** и совместимых машин. Управляйте маленьким кораблём в узком коридоре, уворачивайтесь от астероидов и уничтожайте их выстрелами. На фоне движется звёздное поле, а по мере набора очков растёт скорость. В конце текущего демо вас ждёт большой корабль-босс с двумя пушками.
 
-**Основные возможности:** анимированные астероиды двух размеров, четыре жизни, до шести одновременно выпущенных пуль, счёт и индикатор опасности, предупреждение `SHOOT!` при долгом отсутствии уничтожений, пауза и звуковые эффекты. Музыка использует бипер и, при наличии, **AY**.
+**Основные возможности:** анимированные астероиды двух размеров, четыре жизни, до шести одновременно выпущенных пуль, счёт и индикатор опасности, предупреждение `SHOOT!` при долгом отсутствии уничтожений, пауза и звуковые эффекты. Звук включает биперные эффекты, настраиваемое жужжание двигателя и, при наличии, **AY**-музыку.
 
 **Управление**
 
@@ -32,7 +32,7 @@ TAP содержит BASIC-загрузчик: в обычном режиме ZX
 
 **SpaceCan** is a space shooter for the **ZX Spectrum 48K** and compatible machines. Pilot a small ship through a narrow corridor, dodge incoming asteroids, and shoot them down. A moving starfield creates the sensation of flight, and the game speeds up as your score increases. The current demo finishes with a large twin-cannon boss ship.
 
-**Features:** animated asteroids in two sizes, four lives, up to six player bullets, scoring and a danger meter, a blinking `SHOOT!` warning when you stop destroying asteroids, pause support, and sound effects. The game supports beeper audio and optional **AY** music.
+**Features:** animated asteroids in two sizes, four lives, up to six player bullets, scoring and a danger meter, a blinking `SHOOT!` warning when you stop destroying asteroids, pause support, and sound effects. Sound includes beeper effects, a configurable engine buzz, and optional **AY** music.
 
 **Controls**
 
@@ -61,7 +61,7 @@ sjasmplus --nologo --raw=SpaceCan.bin main.asm
 python3 make_tap.py SpaceCan.bin SpaceCan.tap
 ```
 
-Изменяемые параметры игрового процесса находятся в верхней части `main.asm`, в том числе `DEMO_SPEEDUP_SCORE` и `DEMO_BOSS_SCORE`.
+Изменяемые параметры игрового процесса и звука находятся в верхней части `main.asm`, в том числе `DEMO_SPEEDUP_SCORE`, `DEMO_BOSS_SCORE`, `AY_MUSIC_ENABLED` и `BEEPER_ENGINE_ENABLED`. Оба звуковых переключателя сейчас включены; собирается один общий TAP.
 
 - [CHANGELOG.md — история изменений / development history](CHANGELOG.md)
 - [docs/ — техническая документация / technical documentation](docs/)

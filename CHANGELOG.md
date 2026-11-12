@@ -1,5 +1,14 @@
 # SpaceCan — Changelog / История изменений
 
+## 2026-11-12 — Пробный двигатель на бипере / Optional beeper engine test
+
+- В начале `main.asm` добавлены два независимых флага: `AY_MUSIC_ENABLED EQU 1` и `BEEPER_ENGINE_ENABLED EQU 1`; оба включены, в Releases публикуется только одна версия TAP.
+- Добавлен короткий фоновый биперный гул во время `STATE_PLAYING` и `STATE_BOSS`; более приоритетные звуковые эффекты подавляют двигатель. При паузе, взрыве корабля и вне игры двигатель не звучит.
+- Параметры тембра/нагрузки `BEEPER_ENGINE_PERIOD_1X`, `BEEPER_ENGINE_PERIOD_2X`, `BEEPER_ENGINE_PULSES` редактируются в `main.asm`.
+- Added an independent optional beeper engine without changing AY IM2 player, priority beeper effects, or two-release packaging; both sound switches are ON for testing.
+- Реальное звучание и бюджет кадра пока требуют проверки на железе либо в эмуляторе; звук будет подбираться экспериментально.
+
+
 ## 2026-11-12 — Проверка возрождения / Respawn regression checks
 
 - Проверен путь `STATE_EXPLODING → STATE_RESPAWN → RESTART_ROUND`: старые астероиды неподвижны во время анимации взрыва; после неё экран полностью перерисовывается, а пул астероидов инициализируется заново.
