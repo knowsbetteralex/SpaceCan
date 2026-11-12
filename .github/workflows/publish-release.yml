@@ -8,7 +8,7 @@ on:
       - "**/*.asm"
       - "assets/music/*.aym"
       - "make_tap.py"
-      - "tests/test_make_tap.py"
+      - "tests/**/*.py"
       - "docs/release_notes.md"
       - ".github/workflows/publish-release.yml"
   workflow_dispatch:
