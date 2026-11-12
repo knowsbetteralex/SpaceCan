@@ -17,8 +17,8 @@ class AudioSwitchTests(unittest.TestCase):
     def test_both_modes_on_by_default_and_priority_order(self):
         main = (ROOT / "main.asm").read_text(encoding="utf-8")
         sfx = (ROOT / "sfx.asm").read_text(encoding="utf-8")
-        self.assertRegex(main, r"(?m)^AY_MUSIC_ENABLED\s+EQU 1$")
-        self.assertRegex(main, r"(?m)^BEEPER_ENGINE_ENABLED\s+EQU 1$")
+        self.assertRegex(main, r"(?m)^AY_MUSIC_ENABLED\s+EQU 1(?:\s*;.*)?$")
+        self.assertRegex(main, r"(?m)^BEEPER_ENGINE_ENABLED\s+EQU 1(?:\s*;.*)?$")
         self.assertIn("JR NZ,.SFX", sfx)
         self.assertIn("JP SFX_ENGINE_TICK", sfx)
         self.assertIn("CP STATE_PLAYING", sfx)
@@ -33,17 +33,17 @@ class AudioSwitchTests(unittest.TestCase):
         if assembler is None:
             self.skipTest("sjasmplus is not installed")
         main = (ROOT / "main.asm").read_text(encoding="utf-8")
-        self.assertEqual(len(re.findall(r"(?m)^AY_MUSIC_ENABLED\s+EQU 1$", main)), 1)
-        self.assertEqual(len(re.findall(r"(?m)^BEEPER_ENGINE_ENABLED\s+EQU 1$", main)), 1)
+        self.assertEqual(len(re.findall(r"(?m)^AY_MUSIC_ENABLED\s+EQU 1(?:\s*;.*)?$", main)), 1)
+        self.assertEqual(len(re.findall(r"(?m)^BEEPER_ENGINE_ENABLED\s+EQU 1(?:\s*;.*)?$", main)), 1)
         # The regular 1/1 configuration is assembled by the release job.
         for ay, engine in [(1, 0), (0, 1), (0, 0)]:
             with self.subTest(ay=ay, engine=engine):
                 modified = re.sub(
-                    r"(?m)^AY_MUSIC_ENABLED\s+EQU 1$",
+                    r"(?m)^AY_MUSIC_ENABLED\s+EQU 1(?:\s*;.*)?$",
                     f"AY_MUSIC_ENABLED      EQU {ay}", main,
                 )
                 modified = re.sub(
-                    r"(?m)^BEEPER_ENGINE_ENABLED\s+EQU 1$",
+                    r"(?m)^BEEPER_ENGINE_ENABLED\s+EQU 1(?:\s*;.*)?$",
                     f"BEEPER_ENGINE_ENABLED EQU {engine}", modified,
                 )
                 with tempfile.TemporaryDirectory() as folder:
