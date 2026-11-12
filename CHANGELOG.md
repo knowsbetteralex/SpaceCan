@@ -1,5 +1,13 @@
 # SpaceCan — Changelog / История изменений
 
+## 2026-11-12 — Проверка возрождения / Respawn regression checks
+
+- Проверен путь `STATE_EXPLODING → STATE_RESPAWN → RESTART_ROUND`: старые астероиды неподвижны во время анимации взрыва; после неё экран полностью перерисовывается, а пул астероидов инициализируется заново.
+- Подтверждён запуск волны с Y=4 с задержками 0/20/40/60 кадров; проверены сценарии скоростей 1× и 2×.
+- Added `tests/test_respawn.py` (six structural/regression checks), included in GitHub Actions tests. Tests and sjasmplus compilation pass. No gameplay code changes.
+- Примечание: пока это проверка исходников, модели времён появления и компиляции, а не визуальный прогон в эмуляторе ZX Spectrum.
+
+
 All development notes formerly in README have been preserved below.
 Все записи об изменениях, ранее размещённые в README, сохранены ниже.
 
