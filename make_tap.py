@@ -8,7 +8,7 @@ then RANDOMIZE USR 36864. No extra libraries are needed.
 """
 from pathlib import Path
 from struct import pack
-from sys import argv
+import sys
 
 START_ADDRESS = 0x9000
 CODE_END_LIMIT = 0xFBFD  # Exclusive: keep IM2's 512-byte stack reserve
@@ -57,15 +57,15 @@ def build_tap(data: bytes) -> bytes:
 
 
 def main() -> None:
-    if len(argv) != 3:
+    if len(sys.argv) != 3:
         raise SystemExit("Usage: python3 make_tap.py source.bin output.tap")
-    data = Path(argv[1]).read_bytes()
+    data = Path(sys.argv[1]).read_bytes()
     try:
         tap = build_tap(data)
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
-    Path(argv[2]).write_bytes(tap)
-    print(f"Created {argv[2]} ({len(data)} program bytes, autorun at #9000)")
+    Path(sys.argv[2]).write_bytes(tap)
+    print(f"Created {sys.argv[2]} ({len(data)} program bytes, autorun at #9000)")
 
 
 if __name__ == "__main__":
