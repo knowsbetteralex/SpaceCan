@@ -1,5 +1,5 @@
 ; -------------------------------------------------------------
-; SpaceCan Step 22: centered 3x2 boss after full scroll speed.
+; SpaceCan Step 22: centered 3x2 demo boss at DEMO_BOSS_SCORE.
 ; Its separate state survives a lost player life; the current boss
 ; battle is the DEMO END. Future shooters will precede this battle.
 ; -------------------------------------------------------------
@@ -8,9 +8,10 @@ MAYBE_START_BOSS:
     LD A,(BOSS_STARTED)
     OR A
     RET NZ
-    LD A,(SPEED_LEVEL)
-    CP SPEED_STAGE_COUNT-1        ; maximum stage, score 32768
-    RET NZ
+    LD DE,DEMO_BOSS_SCORE & #FFFF
+    LD A,DEMO_BOSS_SCORE >> 16
+    CALL SCORE_AT_LEAST
+    RET C                          ; before configured score threshold
     JP START_BOSS_PHASE
 
 START_BOSS_PHASE:
