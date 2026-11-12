@@ -357,43 +357,43 @@ ADD_SCORE_A:
     LD (HUD_DIRTY),A
     JP CHECK_SCORE_BONUS
 
-; Thresholds align to #1000/#2000/#4000/#8000.
+; Demo only: jump from stage 0 (1x) straight to stage 2 (2x).
+; Both score limits are defined near the top of main.asm.
 CHECK_SCORE_BONUS:
-    LD A,(SCORE+2)
-    OR A
-    JR NZ,.STAGE_4
-    LD A,(SCORE+1)
-    CP #80
-    JR NC,.STAGE_4
-    CP #40
-    JR NC,.STAGE_3
-    CP #20
-    JR NC,.STAGE_2
-    CP #10
-    JR NC,.STAGE_1
-    XOR A
-    JR .STORE
-.STAGE_1:
-    LD A,1
-    JR .STORE
-.STAGE_2:
-    LD A,2
-    JR .STORE
-.STAGE_3:
-    LD A,3
-    JR .STORE
-.STAGE_4:
-    LD A,4
+    LD DE,DEMO_SPEEDUP_SCORE & #FFFF
+    LD A,DEMO_SPEEDUP_SCORE >> 16
+    CALL SCORE_AT_LEAST
+    LD A,0                        ; before threshold: 1x
+    JR C,.STORE
+    LD A,2                        ; reached threshold: 2x
 .STORE:
     LD HL,SPEED_LEVEL
     CP (HL)
     RET Z
     LD (HL),A
-    SRL A                       ; stage 0..4 => 0,0,1,1,2
-    INC A                       ; integer portion 1..3
+    SRL A                         ; stages 0/2 -> integer 1/2
+    INC A
     LD (SCROLL_SPEED),A
     LD A,1
     LD (HUD_DIRTY),A
+    RET
+
+; Generic 24-bit score comparison, shared with the boss trigger.
+; IN: A=high threshold byte, DE=low 16 bits of threshold.
+; OUT: Carry=1 when SCORE<threshold; Carry=0 otherwise.
+; DESTROYS AF,HL; preserves BC,DE and IX/IY.
+SCORE_AT_LEAST:
+    LD H,A
+    LD A,(SCORE+2)
+    CP H
+    RET C
+    JR NZ,.REACHED
+    LD HL,(SCORE)
+    OR A                          ; clear carry before 16-bit subtract
+    SBC HL,DE
+    RET
+.REACHED:
+    OR A                          ; SCORE high byte exceeds threshold
     RET
 
 ; -------------------------------------------------------------
