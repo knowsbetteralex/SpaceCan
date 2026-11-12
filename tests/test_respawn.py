@@ -48,10 +48,10 @@ class RespawnInvariants(unittest.TestCase):
             r"LD A,\(SHIP_LIVES\)\s+OR A\s+LD A,STATE_RESPAWN"
             r"\s+JR NZ,\.NEXT_MODE\s+LD A,STATE_GAME_OVER",
         )
-        self.assertRegex(
-            source("enemies.asm"),
-            r"UPDATE_ENEMY_SLOT:\s+.*?LD A,\(GAME_STATE\)\s+CP STATE_PLAYING\s+RET NZ",
-        )
+        self.assertIsNotNone(re.search(
+            r"UPDATE_ENEMY_SLOT:.*?LD A,\\(GAME_STATE\\)\\s+CP STATE_PLAYING\\s+RET NZ",
+            source("enemies.asm"), re.S,
+        ))
 
     def test_full_screen_clear_before_slot_reset(self):
         main = source("main.asm")
@@ -92,9 +92,12 @@ class RespawnInvariants(unittest.TestCase):
         self.assertIn("PLAYFIELD_TOP        EQU 4", source("main.asm"))
         update = routine(source("enemies.asm"), "UPDATE_ENEMY_SLOT",
                          "SELECT_ENEMY_SPAWN_X")
-        self.assertRegex(update, r"\.INACTIVE:.*?LD A,\(IX\+E_RESPAWN\)"
-                         r".*?DEC A.*?LD \(IX\+E_RESPAWN\),A\s+RET NZ"
-                         r".*?\.RESPAWN:.*?LD A,PLAYFIELD_TOP\s+LD \(IX\+E_Y\),A")
+        self.assertIsNotNone(re.search(
+            r"\\.INACTIVE:.*?LD A,\\(IX\\+E_RESPAWN\\)"
+            r".*?DEC A.*?LD \\(IX\\+E_RESPAWN\\),A\\s+RET NZ"
+            r".*?\\.RESPAWN:.*?LD A,PLAYFIELD_TOP\\s+LD \\(IX\\+E_Y\\),A",
+            update, re.S,
+        ))
         self.assertIn("CALL ENEMY_SPAWN_GAP_CLEAR", update)
 
     def test_initial_wave_spacing_at_both_demo_speeds(self):
