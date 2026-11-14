@@ -69,12 +69,13 @@ MAX_ENEMIES          EQU 4
 BOSS_MAX_HP          EQU PRESSURE_SEGMENTS
 BOSS_X_CENTER        EQU 14 ; 3 columns 14..16, centered
 BOSS_START_Y         EQU PLAYFIELD_TOP
-BOSS_TARGET_Y        EQU 12
+BOSS_TARGET_Y        EQU 7    ; 3/4 of corridor away from player
 BOSS_ENTRY_DELAY     EQU 5
 BOSS_ANIM_DELAY      EQU 12
 BOSS_FIRE_DELAY      EQU 45
+BOSS_PLAYER_SHOT_DELAY EQU 18 ; minimum gap in gameplay frames
 MAX_HOSTILE_BULLETS  EQU 6
-HOSTILE_BULLET_SIZE  EQU 7
+HOSTILE_BULLET_SIZE  EQU 8    ; extra fixed target-X byte
 HOSTILE_MOVE_DELAY   EQU 4
 ENEMY_SLOT_SIZE      EQU 15
 ENEMY_FRAME_DELAY    EQU 8     ; rotate once every 8 ticks
