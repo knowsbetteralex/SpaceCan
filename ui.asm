@@ -265,7 +265,8 @@ RENDER_PRESSURE_GAUGE:
     LD A,(BOSS_STARTED)
     OR A
     JR Z,.PRESSURE
-    ; Boss HP repurposes the ten green/red penalty segments.
+    ; Ten boss segments, two hits each. Current half-damaged segment
+    ; blinks yellow/cyan, completed ones remain solid red.
     LD A,(BOSS_HP)
     LD B,A
     LD C,PRESSURE_SEGMENTS
@@ -274,11 +275,20 @@ RENDER_PRESSURE_GAUGE:
     LD A,C
     CP B
     JR C,.BOSS_ALIVE
+    JR Z,.BOSS_CURRENT
+    LD A,#42                     ; red = 2 hits received
+    JR .BOSS_STORE
+.BOSS_CURRENT:
+    LD A,(BOSS_HIT_HALF)
+    OR A
     JR Z,.BOSS_ALIVE
-    LD A,#42                     ; red = depleted boss health
+    LD A,(BOSS_BLINK_COUNTER)
+    AND 8
+    JR Z,.BOSS_ALIVE
+    LD A,#46                     ; yellow = current segment hit once
     JR .BOSS_STORE
 .BOSS_ALIVE:
-    LD A,#45                     ; bright cyan = remaining boss HP
+    LD A,#45                     ; cyan = remaining health
 .BOSS_STORE:
     LD (HL),A
     INC HL
