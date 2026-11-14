@@ -1,17 +1,15 @@
 # SpaceCan demo / Демоверсия SpaceCan
 
-**Русский:** космическая аркада для ZX Spectrum 48K. Скачать `SpaceCan.tap` в разделе Assets; на Spectrum запустить командой `LOAD ""`.
+**Русский:** скачайте `SpaceCan.tap` из Assets, на ZX Spectrum используйте `LOAD ""`.
 
-**English:** ZX Spectrum 48K space shooter. Download `SpaceCan.tap` from Assets and load with `LOAD ""` (BASIC autostart included).
+**English:** Download `SpaceCan.tap` from Assets; run `LOAD ""` on ZX Spectrum.
 
-### Что изменилось / What's new
+### Изменения / What's new
 
-- **Два переключателя звука включены:** AY-музыка и пробное низкое жужжание двигателя на бипере; биперные выстрелы/взрывы имеют приоритет / **Both audio switches enabled:** AY music plus experimental beeper engine buzz; shots and explosions take priority.
-- Один TAP для тестирования; тембр регулируется в `main.asm` / One TAP for testing; adjust the engine tone in `main.asm`.
-- Ускорение **2× после 4 096 очков**, финальный босс после **8 192** / 2× speed at 4,096 points; boss at 8,192.
-- При потере жизни астероиды начинают полёт **сверху**, выходят по очереди / After respawn, all asteroids re-enter from the top in staggered waves.
-- Босс 24×16 с двумя пушками, 10 HP на индикаторе и экраном победы / 24×16 twin-cannon boss, 10-segment HP meter and victory screen.
-- Мигающее предупреждение **SHOOT!** после экрана без уничтожений / Blinking SHOOT! warning after one screen without a kill.
-- Самозапускающийся TAP с BASIC-загрузчиком / Self-starting TAP with BASIC loader.
+- Босс стреляет из двух пушек в сторону запомненной позиции корабля, вместо фиксированных X=14/16 / Boss volleys now aim at the player's position at firing time, rather than staying in fixed lanes.
+- Во время боя с боссом выстрелы игрока ограничены одним за 18 кадров / Player firing limited to once every 18 frames in the boss fight.
+- У босса 10 делений по 2 попадания: первое заставляет мигать деление, второе делает его красным / Boss HP gauge: 10 segments, two hits each; first blinks, second turns red.
+- Босс находится выше, на Y=7 вместо Y=12 / Boss stops higher on the screen.
+- Обновлён необязательный звук двигателя; сейчас переключатель `BEEPER_ENGINE_ENABLED` стоит в `0` — установите `1`, чтобы услышать новый вариант / Optional engine buzz was varied; build currently leaves its switch off to respect current configuration.
 
-[Full changelog / Полная история](https://github.com/knowsbetteralex/SpaceCan/blob/main/CHANGELOG.md)
+[Полная история / Full changelog](https://github.com/knowsbetteralex/SpaceCan/blob/main/CHANGELOG.md)
