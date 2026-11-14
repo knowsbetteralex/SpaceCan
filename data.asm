@@ -102,7 +102,10 @@ PRESSURE_LEVEL:
     DB 0                        ; 0..10, persistent red segments right-to-left
 BOSS_STARTED:         DB 0      ; boss phase reached this game
 BOSS_ACTIVE:          DB 0
-BOSS_HP:              DB 0      ; 10 HP shown by shared gauge
+BOSS_HP:              DB 0      ; 10 segments, 2 hits per segment
+BOSS_HIT_HALF:        DB 0      ; current segment has taken one hit
+BOSS_BLINK_COUNTER:   DB 0      ; toggles yellow/cyan every 8 frames
+BOSS_SHOT_CLOCK:      DB 0      ; player shot cooldown in boss fight
 BOSS_X:               DB BOSS_X_CENTER
 BOSS_Y:               DB BOSS_START_Y
 BOSS_DRAWN:           DB 0
