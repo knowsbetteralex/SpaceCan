@@ -252,8 +252,9 @@ SFX_FE_BASE: DB 1                  ; shadow: border/MIC only, no EAR
 ; exploding, in the menu or on Game Over.
 ;
 ; Two repeats of each half-wave delay lower the carrier frequency.
-; PERIOD_1X=96 / PERIOD_2X=72 and 2 pulses give roughly 3–4 ms
-; of busy-wait/frame at 3.5MHz (tune after testing on real hardware).
+; A 32-frame triangular sweep and an extra pulse every eighth frame
+; add rhythm without changing the sound driver architecture.
+; CPU cost depends on pulse count; measure it on the target machine.
 ; DI/EI keeps each EAR pulse atomic versus IM2; AY still plays via
 ; its interrupt outside this short packet. End with EAR low.
 ; -------------------------------------------------------------
@@ -265,11 +266,22 @@ SFX_ENGINE_TICK:
     CP STATE_BOSS
     RET NZ
 .FLYING:
+    ; Thirty-two-frame ascending/descending engine sweep.
+    ; A slow periodic pitch change plus independent 2-bit jitter.
     LD HL,SFX_ENGINE_PHASE
     INC (HL)
     LD A,(HL)
-    AND 7                         ; small 0..7 pitch jitter
-    LD E,A
+    AND #1F
+    CP 16
+    JR C,.RAMP_UP
+    CPL
+    AND #0F
+.RAMP_UP:
+    LD E,A                         ; triangular detune 0..15
+    CALL SFX_SHIP_RANDOM           ; one LFSR update per frame
+    AND 3
+    ADD A,E
+    LD E,A                         ; total pitch shift 0..18
     LD A,(SCROLL_SPEED)
     CP 2
     LD A,BEEPER_ENGINE_PERIOD_1X
@@ -279,6 +291,11 @@ SFX_ENGINE_TICK:
     ADD A,E
     LD C,A
     LD B,BEEPER_ENGINE_PULSES
+    LD A,(SFX_ENGINE_PHASE)
+    AND 7
+    JR NZ,.PULSE_COUNT_READY
+    INC B                         ; rhythmic stronger thrust burst
+.PULSE_COUNT_READY:
     DI
     LD A,(SFX_FE_BASE)
     AND #0F                       ; preserve border + MIC
