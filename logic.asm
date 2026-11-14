@@ -175,6 +175,12 @@ UPDATE_GAME:
 
 ; Final boss has no asteroids and no missed-screen penalty.
 UPDATE_BOSS_GAME:
+    LD HL,BOSS_SHOT_CLOCK
+    LD A,(HL)
+    OR A
+    JR Z,.READY
+    DEC (HL)                     ; pauses with the gameplay state
+.READY:
     CALL UPDATE_BOSS
     CALL UPDATE_HOSTILE_BULLETS
     LD A,(GAME_STATE)
