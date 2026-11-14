@@ -13,7 +13,7 @@
 ; Beeper shots/explosions always work, regardless of both flags.
 ; -------------------------------------------------------------
 AY_MUSIC_ENABLED      EQU 1    ; AY soundtrack in IM2 (needs AY board)
-BEEPER_ENGINE_ENABLED EQU 1    ; idle engine buzz on #FE during flight
+BEEPER_ENGINE_ENABLED EQU 0    ; idle engine buzz on #FE during flight
 AY_TARGET_CLOCK       EQU 2000000 ; Delta-C AY oscillator
 
 ; BEEPER ENGINE TUNING (only used when BEEPER_ENGINE_ENABLED=1):
