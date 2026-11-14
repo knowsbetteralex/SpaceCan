@@ -15,6 +15,14 @@
 ; Bullet preserves the ship's exact 4px alignment at firing.
 ; DESTROYS AF, BC, DE, HL, IX.
 FIRE_BULLET:
+    ; During the boss encounter, only fire after the cooldown.
+    LD A,(GAME_STATE)
+    CP STATE_BOSS
+    JR NZ,.CHECK_POOL
+    LD A,(BOSS_SHOT_CLOCK)
+    OR A
+    RET NZ
+.CHECK_POOL:
     LD A,(BULLET_COUNT)
     CP MAX_BULLETS
     RET Z
@@ -39,6 +47,12 @@ FIRE_BULLET:
     LD (IX+B_DIRTY),A
     LD HL,BULLET_COUNT
     INC (HL)
+    LD A,(GAME_STATE)
+    CP STATE_BOSS
+    JR NZ,.SOUND
+    LD A,BOSS_PLAYER_SHOT_DELAY
+    LD (BOSS_SHOT_CLOCK),A       ; only on successful spawn
+.SOUND:
     LD A,SFX_SHOT
     JP SFX_START                 ; sound only after successful spawn
 .NEXT_SLOT:
