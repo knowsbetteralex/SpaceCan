@@ -19,6 +19,9 @@ START_BOSS_PHASE:
     LD (BOSS_STARTED),A
     LD A,BOSS_MAX_HP
     LD (BOSS_HP),A
+    XOR A
+    LD (BOSS_HIT_HALF),A
+    LD (BOSS_BLINK_COUNTER),A
     CALL BOSS_DISABLE_ASTEROIDS
     CALL RESET_HOSTILE_BULLETS
     ; An asteroid killed at the score threshold may still be exploding.
@@ -50,6 +53,8 @@ BOSS_RESET_ENTRY:
     LD (BOSS_ANIM_TIMER),A
     LD A,BOSS_FIRE_DELAY
     LD (BOSS_FIRE_TIMER),A
+    XOR A
+    LD (BOSS_SHOT_CLOCK),A       ; reset player cooldown per life
     LD A,1
     LD (BOSS_ACTIVE),A
     LD (BOSS_DIRTY),A
@@ -96,6 +101,7 @@ UPDATE_BOSS:
     LD (BOSS_DIRTY),A
     RET
 .CENTERED:
+    CALL BOSS_UPDATE_HALF_BLINK
     LD HL,BOSS_ANIM_TIMER
     DEC (HL)
     JR NZ,.FIRE
@@ -113,18 +119,47 @@ UPDATE_BOSS:
     LD (HL),BOSS_FIRE_DELAY
     JP BOSS_FIRE_PAIR
 
-; Two muzzles, left and right outside the cockpit.
+; Dual cannons target two adjacent lanes around the player's X.
+; Targets are snapshots. Left/right trajectories never cross.
 BOSS_FIRE_PAIR:
     LD A,(BOSS_Y)
     ADD A,2
     LD B,A
     LD A,(BOSS_X)
     LD C,A
-    CALL SPAWN_HOSTILE_BULLET     ; preserves BC
+    LD A,(SHIP_NEW_POS)
+    CP PLAYFIELD_RIGHT
+    JR C,.LEFT_AIM
+    LD A,PLAYFIELD_RIGHT-1
+.LEFT_AIM:
+    CALL SPAWN_HOSTILE_BULLET    ; A=target X; BC=launch position
     LD A,(BOSS_X)
     ADD A,2
     LD C,A
+    LD A,(SHIP_NEW_POS)
+    CP PLAYFIELD_RIGHT
+    JR NC,.RIGHT_EDGE
+    INC A
+    JR .RIGHT_AIM
+.RIGHT_EDGE:
+    LD A,PLAYFIELD_RIGHT
+.RIGHT_AIM:
     JP SPAWN_HOSTILE_BULLET
+
+; Blink the current half-damaged segment every 8 game frames.
+; HUD writes the color; IRQ does not touch screen memory.
+BOSS_UPDATE_HALF_BLINK:
+    LD A,(BOSS_HIT_HALF)
+    OR A
+    RET Z
+    LD HL,BOSS_BLINK_COUNTER
+    INC (HL)
+    LD A,(HL)
+    AND 7
+    RET NZ
+    LD A,1
+    LD (GAUGE_DIRTY),A
+    RET
 
 ; IN IX=player bullet. CARRY SET iff bullet consumed on boss.
 CHECK_BULLET_BOSS:
@@ -169,12 +204,28 @@ CHECK_BULLET_BOSS:
     OR A
     RET
 
-; The same gauge holds 10 boss HP. Each player hit removes one.
+; A gauge segment requires TWO successful player bullets.
+; First hit: flashing cyan/yellow. Second: solid red.
+; Partial damage survives loss of a player life.
 BOSS_TAKE_HIT:
-    LD HL,BOSS_HP
-    LD A,(HL)
+    LD A,(BOSS_ACTIVE)
     OR A
     RET Z
+    LD A,(BOSS_HIT_HALF)
+    OR A
+    JR NZ,.SECOND_HIT
+    LD A,1
+    LD (BOSS_HIT_HALF),A
+    LD (GAUGE_DIRTY),A
+    LD (BOSS_DIRTY),A
+    LD A,8                        ; start with yellow flash
+    LD (BOSS_BLINK_COUNTER),A
+    LD A,SFX_HIT
+    JP SFX_START
+.SECOND_HIT:
+    XOR A
+    LD (BOSS_HIT_HALF),A
+    LD HL,BOSS_HP
     DEC (HL)
     LD A,1
     LD (GAUGE_DIRTY),A
