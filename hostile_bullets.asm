@@ -1,6 +1,7 @@
 ; -------------------------------------------------------------
 ; Shared hostile bullets (boss now, manoeuvring shooters later).
-; 6 slots x 7 bytes, one 8x8 sprite, 1 row per 4 gameplay ticks.
+; 6 slots x 8 bytes, one 8x8 sprite, 1 row per 4 gameplay ticks.
+; Each shot remembers the player's position when fired.
 ; -------------------------------------------------------------
 
 HB_ACTIVE  EQU 0
@@ -10,6 +11,7 @@ HB_DRAWN   EQU 3
 HB_DRAW_X  EQU 4
 HB_DRAW_Y  EQU 5
 HB_DIRTY   EQU 6
+HB_TARGET_X EQU 7
 
 RESET_HOSTILE_BULLETS:
     LD HL,HOSTILE_BULLET_POOL
@@ -21,11 +23,13 @@ RESET_HOSTILE_BULLETS:
     LD (HOSTILE_BULLET_CLOCK),A
     RET
 
-; IN BC=YX (B=row, C=column). PRESERVE BC/DE/IX.
+; IN B=spawn Y, C=spawn X, A=target X (fixed once launched).
+; PRESERVES BC,DE,IX. DESTROYS AF,HL.
 SPAWN_HOSTILE_BULLET:
     PUSH BC
     PUSH DE
     PUSH IX
+    LD E,A                        ; keep target during slot search
     LD IX,HOSTILE_BULLET_POOL
     LD D,MAX_HOSTILE_BULLETS
 .FIND:
@@ -37,6 +41,7 @@ SPAWN_HOSTILE_BULLET:
     JR NZ,.NEXT
     LD (IX+HB_X),C
     LD (IX+HB_Y),B
+    LD (IX+HB_TARGET_X),E
     LD A,1
     LD (IX+HB_ACTIVE),A
     LD (IX+HB_DIRTY),A
@@ -93,6 +98,20 @@ UPDATE_HOSTILE_SLOT:
     JR NC,.EXPIRE
     INC A
     LD (IX+HB_Y),A
+
+    ; One horizontal cell per vertical step, toward launch target.
+    ; No live homing: player can dodge the aimed projectile.
+    LD A,(IX+HB_X)
+    LD C,A
+    LD A,(IX+HB_TARGET_X)
+    CP C
+    JR Z,.MOVED
+    JR C,.MOVE_LEFT
+    INC (IX+HB_X)
+    JR .MOVED
+.MOVE_LEFT:
+    DEC (IX+HB_X)
+.MOVED:
     LD A,1
     LD (IX+HB_DIRTY),A
 .CHECK_SHIP:
