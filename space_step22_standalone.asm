@@ -6,6 +6,13 @@
 ; Cockpit HUD: Y=0..3; playfield: X=8..23, Y=4..23.
 ; Render after HALT; update logic and moving stars for NEXT frame.
 
+; SpaceCan Step 22: short demo progression (2x at 4096; boss at 8192).
+; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
+;
+; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
+; Cockpit HUD: Y=0..3; playfield: X=8..23, Y=4..23.
+; Render after HALT; update logic and moving stars for NEXT frame.
+
     ORG #9000
 
 ; -------------------------------------------------------------
@@ -14,7 +21,7 @@
 ; Beeper shots/explosions always work, regardless of both flags.
 ; -------------------------------------------------------------
 AY_MUSIC_ENABLED      EQU 1    ; AY soundtrack in IM2 (needs AY board)
-BEEPER_ENGINE_ENABLED EQU 1    ; idle engine buzz on #FE during flight
+BEEPER_ENGINE_ENABLED EQU 0    ; idle engine buzz on #FE during flight
 AY_TARGET_CLOCK       EQU 2000000 ; Delta-C AY oscillator
 
 ; BEEPER ENGINE TUNING (only used when BEEPER_ENGINE_ENABLED=1):
@@ -70,12 +77,13 @@ MAX_ENEMIES          EQU 4
 BOSS_MAX_HP          EQU PRESSURE_SEGMENTS
 BOSS_X_CENTER        EQU 14 ; 3 columns 14..16, centered
 BOSS_START_Y         EQU PLAYFIELD_TOP
-BOSS_TARGET_Y        EQU 12
+BOSS_TARGET_Y        EQU 7    ; 3/4 of corridor away from player
 BOSS_ENTRY_DELAY     EQU 5
 BOSS_ANIM_DELAY      EQU 12
 BOSS_FIRE_DELAY      EQU 45
+BOSS_PLAYER_SHOT_DELAY EQU 18 ; minimum gap in gameplay frames
 MAX_HOSTILE_BULLETS  EQU 6
-HOSTILE_BULLET_SIZE  EQU 7
+HOSTILE_BULLET_SIZE  EQU 8    ; extra fixed target-X byte
 HOSTILE_MOVE_DELAY   EQU 4
 ENEMY_SLOT_SIZE      EQU 15
 ENEMY_FRAME_DELAY    EQU 8     ; rotate once every 8 ticks
@@ -1098,8 +1106,9 @@ SFX_FE_BASE: DB 1                  ; shadow: border/MIC only, no EAR
 ; exploding, in the menu or on Game Over.
 ;
 ; Two repeats of each half-wave delay lower the carrier frequency.
-; PERIOD_1X=96 / PERIOD_2X=72 and 2 pulses give roughly 3–4 ms
-; of busy-wait/frame at 3.5MHz (tune after testing on real hardware).
+; A 32-frame triangular sweep and an extra pulse every eighth frame
+; add rhythm without changing the sound driver architecture.
+; CPU cost depends on pulse count; measure it on the target machine.
 ; DI/EI keeps each EAR pulse atomic versus IM2; AY still plays via
 ; its interrupt outside this short packet. End with EAR low.
 ; -------------------------------------------------------------
@@ -1111,11 +1120,22 @@ SFX_ENGINE_TICK:
     CP STATE_BOSS
     RET NZ
 .FLYING:
+    ; Thirty-two-frame ascending/descending engine sweep.
+    ; A slow periodic pitch change plus independent 2-bit jitter.
     LD HL,SFX_ENGINE_PHASE
     INC (HL)
     LD A,(HL)
-    AND 7                         ; small 0..7 pitch jitter
-    LD E,A
+    AND #1F
+    CP 16
+    JR C,.RAMP_UP
+    CPL
+    AND #0F
+.RAMP_UP:
+    LD E,A                         ; triangular detune 0..15
+    CALL SFX_SHIP_RANDOM           ; one LFSR update per frame
+    AND 3
+    ADD A,E
+    LD E,A                         ; total pitch shift 0..18
     LD A,(SCROLL_SPEED)
     CP 2
     LD A,BEEPER_ENGINE_PERIOD_1X
@@ -1125,6 +1145,11 @@ SFX_ENGINE_TICK:
     ADD A,E
     LD C,A
     LD B,BEEPER_ENGINE_PULSES
+    LD A,(SFX_ENGINE_PHASE)
+    AND 7
+    JR NZ,.PULSE_COUNT_READY
+    INC B                         ; rhythmic stronger thrust burst
+.PULSE_COUNT_READY:
     DI
     LD A,(SFX_FE_BASE)
     AND #0F                       ; preserve border + MIC
@@ -1920,6 +1945,12 @@ UPDATE_GAME:
 
 ; Final boss has no asteroids and no missed-screen penalty.
 UPDATE_BOSS_GAME:
+    LD HL,BOSS_SHOT_CLOCK
+    LD A,(HL)
+    OR A
+    JR Z,.READY
+    DEC (HL)                     ; pauses with the gameplay state
+.READY:
     CALL UPDATE_BOSS
     CALL UPDATE_HOSTILE_BULLETS
     LD A,(GAME_STATE)
@@ -2219,6 +2250,14 @@ RESET_MISS_TRAVEL:
 ; Bullet preserves the ship's exact 4px alignment at firing.
 ; DESTROYS AF, BC, DE, HL, IX.
 FIRE_BULLET:
+    ; During the boss encounter, only fire after the cooldown.
+    LD A,(GAME_STATE)
+    CP STATE_BOSS
+    JR NZ,.CHECK_POOL
+    LD A,(BOSS_SHOT_CLOCK)
+    OR A
+    RET NZ
+.CHECK_POOL:
     LD A,(BULLET_COUNT)
     CP MAX_BULLETS
     RET Z
@@ -2243,6 +2282,12 @@ FIRE_BULLET:
     LD (IX+B_DIRTY),A
     LD HL,BULLET_COUNT
     INC (HL)
+    LD A,(GAME_STATE)
+    CP STATE_BOSS
+    JR NZ,.SOUND
+    LD A,BOSS_PLAYER_SHOT_DELAY
+    LD (BOSS_SHOT_CLOCK),A       ; only on successful spawn
+.SOUND:
     LD A,SFX_SHOT
     JP SFX_START                 ; sound only after successful spawn
 .NEXT_SLOT:
@@ -2469,7 +2514,8 @@ ERASE_BULLET_SLOT:
 ; ===== hostile_bullets.asm =====
 ; -------------------------------------------------------------
 ; Shared hostile bullets (boss now, manoeuvring shooters later).
-; 6 slots x 7 bytes, one 8x8 sprite, 1 row per 4 gameplay ticks.
+; 6 slots x 8 bytes, one 8x8 sprite, 1 row per 4 gameplay ticks.
+; Each shot remembers the player's position when fired.
 ; -------------------------------------------------------------
 
 HB_ACTIVE  EQU 0
@@ -2479,6 +2525,7 @@ HB_DRAWN   EQU 3
 HB_DRAW_X  EQU 4
 HB_DRAW_Y  EQU 5
 HB_DIRTY   EQU 6
+HB_TARGET_X EQU 7
 
 RESET_HOSTILE_BULLETS:
     LD HL,HOSTILE_BULLET_POOL
@@ -2490,11 +2537,13 @@ RESET_HOSTILE_BULLETS:
     LD (HOSTILE_BULLET_CLOCK),A
     RET
 
-; IN BC=YX (B=row, C=column). PRESERVE BC/DE/IX.
+; IN B=spawn Y, C=spawn X, A=target X (fixed once launched).
+; PRESERVES BC,DE,IX. DESTROYS AF,HL.
 SPAWN_HOSTILE_BULLET:
     PUSH BC
     PUSH DE
     PUSH IX
+    LD E,A                        ; keep target during slot search
     LD IX,HOSTILE_BULLET_POOL
     LD D,MAX_HOSTILE_BULLETS
 .FIND:
@@ -2506,6 +2555,7 @@ SPAWN_HOSTILE_BULLET:
     JR NZ,.NEXT
     LD (IX+HB_X),C
     LD (IX+HB_Y),B
+    LD (IX+HB_TARGET_X),E
     LD A,1
     LD (IX+HB_ACTIVE),A
     LD (IX+HB_DIRTY),A
@@ -2562,6 +2612,20 @@ UPDATE_HOSTILE_SLOT:
     JR NC,.EXPIRE
     INC A
     LD (IX+HB_Y),A
+
+    ; One horizontal cell per vertical step, toward launch target.
+    ; No live homing: player can dodge the aimed projectile.
+    LD A,(IX+HB_X)
+    LD C,A
+    LD A,(IX+HB_TARGET_X)
+    CP C
+    JR Z,.MOVED
+    JR C,.MOVE_LEFT
+    INC (IX+HB_X)
+    JR .MOVED
+.MOVE_LEFT:
+    DEC (IX+HB_X)
+.MOVED:
     LD A,1
     LD (IX+HB_DIRTY),A
 .CHECK_SHIP:
@@ -3596,6 +3660,9 @@ START_BOSS_PHASE:
     LD (BOSS_STARTED),A
     LD A,BOSS_MAX_HP
     LD (BOSS_HP),A
+    XOR A
+    LD (BOSS_HIT_HALF),A
+    LD (BOSS_BLINK_COUNTER),A
     CALL BOSS_DISABLE_ASTEROIDS
     CALL RESET_HOSTILE_BULLETS
     ; An asteroid killed at the score threshold may still be exploding.
@@ -3627,6 +3694,8 @@ BOSS_RESET_ENTRY:
     LD (BOSS_ANIM_TIMER),A
     LD A,BOSS_FIRE_DELAY
     LD (BOSS_FIRE_TIMER),A
+    XOR A
+    LD (BOSS_SHOT_CLOCK),A       ; reset player cooldown per life
     LD A,1
     LD (BOSS_ACTIVE),A
     LD (BOSS_DIRTY),A
@@ -3673,6 +3742,7 @@ UPDATE_BOSS:
     LD (BOSS_DIRTY),A
     RET
 .CENTERED:
+    CALL BOSS_UPDATE_HALF_BLINK
     LD HL,BOSS_ANIM_TIMER
     DEC (HL)
     JR NZ,.FIRE
@@ -3690,18 +3760,47 @@ UPDATE_BOSS:
     LD (HL),BOSS_FIRE_DELAY
     JP BOSS_FIRE_PAIR
 
-; Two muzzles, left and right outside the cockpit.
+; Dual cannons target two adjacent lanes around the player's X.
+; Targets are snapshots. Left/right trajectories never cross.
 BOSS_FIRE_PAIR:
     LD A,(BOSS_Y)
     ADD A,2
     LD B,A
     LD A,(BOSS_X)
     LD C,A
-    CALL SPAWN_HOSTILE_BULLET     ; preserves BC
+    LD A,(SHIP_NEW_POS)
+    CP PLAYFIELD_RIGHT
+    JR C,.LEFT_AIM
+    LD A,PLAYFIELD_RIGHT-1
+.LEFT_AIM:
+    CALL SPAWN_HOSTILE_BULLET    ; A=target X; BC=launch position
     LD A,(BOSS_X)
     ADD A,2
     LD C,A
+    LD A,(SHIP_NEW_POS)
+    CP PLAYFIELD_RIGHT
+    JR NC,.RIGHT_EDGE
+    INC A
+    JR .RIGHT_AIM
+.RIGHT_EDGE:
+    LD A,PLAYFIELD_RIGHT
+.RIGHT_AIM:
     JP SPAWN_HOSTILE_BULLET
+
+; Blink the current half-damaged segment every 8 game frames.
+; HUD writes the color; IRQ does not touch screen memory.
+BOSS_UPDATE_HALF_BLINK:
+    LD A,(BOSS_HIT_HALF)
+    OR A
+    RET Z
+    LD HL,BOSS_BLINK_COUNTER
+    INC (HL)
+    LD A,(HL)
+    AND 7
+    RET NZ
+    LD A,1
+    LD (GAUGE_DIRTY),A
+    RET
 
 ; IN IX=player bullet. CARRY SET iff bullet consumed on boss.
 CHECK_BULLET_BOSS:
@@ -3746,12 +3845,28 @@ CHECK_BULLET_BOSS:
     OR A
     RET
 
-; The same gauge holds 10 boss HP. Each player hit removes one.
+; A gauge segment requires TWO successful player bullets.
+; First hit: flashing cyan/yellow. Second: solid red.
+; Partial damage survives loss of a player life.
 BOSS_TAKE_HIT:
-    LD HL,BOSS_HP
-    LD A,(HL)
+    LD A,(BOSS_ACTIVE)
     OR A
     RET Z
+    LD A,(BOSS_HIT_HALF)
+    OR A
+    JR NZ,.SECOND_HIT
+    LD A,1
+    LD (BOSS_HIT_HALF),A
+    LD (GAUGE_DIRTY),A
+    LD (BOSS_DIRTY),A
+    LD A,8                        ; start with yellow flash
+    LD (BOSS_BLINK_COUNTER),A
+    LD A,SFX_HIT
+    JP SFX_START
+.SECOND_HIT:
+    XOR A
+    LD (BOSS_HIT_HALF),A
+    LD HL,BOSS_HP
     DEC (HL)
     LD A,1
     LD (GAUGE_DIRTY),A
@@ -5001,7 +5116,8 @@ RENDER_PRESSURE_GAUGE:
     LD A,(BOSS_STARTED)
     OR A
     JR Z,.PRESSURE
-    ; Boss HP repurposes the ten green/red penalty segments.
+    ; Ten boss segments, two hits each. Current half-damaged segment
+    ; blinks yellow/cyan, completed ones remain solid red.
     LD A,(BOSS_HP)
     LD B,A
     LD C,PRESSURE_SEGMENTS
@@ -5010,11 +5126,20 @@ RENDER_PRESSURE_GAUGE:
     LD A,C
     CP B
     JR C,.BOSS_ALIVE
+    JR Z,.BOSS_CURRENT
+    LD A,#42                     ; red = 2 hits received
+    JR .BOSS_STORE
+.BOSS_CURRENT:
+    LD A,(BOSS_HIT_HALF)
+    OR A
     JR Z,.BOSS_ALIVE
-    LD A,#42                     ; red = depleted boss health
+    LD A,(BOSS_BLINK_COUNTER)
+    AND 8
+    JR Z,.BOSS_ALIVE
+    LD A,#46                     ; yellow = current segment hit once
     JR .BOSS_STORE
 .BOSS_ALIVE:
-    LD A,#45                     ; bright cyan = remaining boss HP
+    LD A,#45                     ; cyan = remaining health
 .BOSS_STORE:
     LD (HL),A
     INC HL
@@ -5237,7 +5362,10 @@ PRESSURE_LEVEL:
     DB 0                        ; 0..10, persistent red segments right-to-left
 BOSS_STARTED:         DB 0      ; boss phase reached this game
 BOSS_ACTIVE:          DB 0
-BOSS_HP:              DB 0      ; 10 HP shown by shared gauge
+BOSS_HP:              DB 0      ; 10 segments, 2 hits per segment
+BOSS_HIT_HALF:        DB 0      ; current segment has taken one hit
+BOSS_BLINK_COUNTER:   DB 0      ; toggles yellow/cyan every 8 frames
+BOSS_SHOT_CLOCK:      DB 0      ; player shot cooldown in boss fight
 BOSS_X:               DB BOSS_X_CENTER
 BOSS_Y:               DB BOSS_START_Y
 BOSS_DRAWN:           DB 0
