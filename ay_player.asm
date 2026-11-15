@@ -51,6 +51,7 @@ AY_STOP_RAW:
     LD (AY_ACTIVE),A
     LD (AY_PAUSED),A
     LD (AY_WAIT),A
+    LD (AY_BOSS_BOOM_LEFT),A
     JP AY_SILENCE
 
 ; Header v1 (16 bytes):
@@ -308,6 +309,75 @@ AY_TICK_INTERNAL:
     JP Z,AY_STOP_RAW              ; no endless zero-length loop
     LD (AY_POS),HL
     JP .DECODE                    ; loop boundary has no extra tick
+
+; Dedicated boss finale: AY noise channel C, separate from AYM1.
+; Atomic entry with the caller's IFF preserved. R6/R7/R10 alone
+; are owned for 80 IM2 ticks, then the chip is silenced.
+AY_BOSS_BOOM_START:
+    LD A,I
+    PUSH AF
+    DI
+    CALL AY_STOP_RAW
+    LD A,80
+    LD (AY_BOSS_BOOM_LEFT),A
+    LD E,#1F                     ; tone off, noise only on C
+    LD A,7
+    CALL AY_WRITE_REG
+    LD E,1
+    LD A,6
+    CALL AY_WRITE_REG
+    LD E,15
+    LD A,10
+    CALL AY_WRITE_REG
+    POP AF
+    RET PO
+    EI
+    RET
+
+; IM2-only, AF/BC/DE/HL already protected by the caller.
+AY_BOSS_BOOM_TICK:
+    LD HL,AY_BOSS_BOOM_LEFT
+    LD A,(HL)
+    OR A
+    RET Z
+    DEC (HL)
+    JR Z,.END
+    LD A,(AY_BOSS_NOISE_SEED)
+    SRL A
+    JR NC,.NO_XOR
+    XOR #B8
+.NO_XOR:
+    LD (AY_BOSS_NOISE_SEED),A
+    AND #1F
+    OR 1                         ; noise frequency varies every frame
+    LD E,A
+    LD A,6
+    CALL AY_WRITE_REG
+    LD A,(AY_BOSS_BOOM_LEFT)
+    LD E,15
+    CP 64
+    JR NC,.VOLUME
+    LD E,12
+    CP 48
+    JR NC,.VOLUME
+    LD E,9
+    CP 30
+    JR NC,.VOLUME
+    LD E,6
+    CP 18
+    JR NC,.VOLUME
+    LD E,3
+    CP 7
+    JR NC,.VOLUME
+    LD E,1
+.VOLUME:
+    LD A,10
+    JP AY_WRITE_REG
+.END:
+    JP AY_SILENCE
+
+AY_BOSS_BOOM_LEFT: DB 0
+AY_BOSS_NOISE_SEED: DB #B5
 
 AY_ACTIVE:       DB 0
 AY_PAUSED:       DB 0

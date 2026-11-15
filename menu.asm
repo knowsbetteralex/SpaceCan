@@ -83,12 +83,12 @@ SHOW_VICTORY:
     LD BC,#0D0C
     LD DE,MENU_YOU_WIN
     CALL MENU_PRINT_TEXT
+    ; The beeper victory melody plays first, then the AY fanfare.
+    LD HL,MELODY_VICTORY
+    CALL MELODY_PLAY
     IF AY_MUSIC_ENABLED
-        LD HL,AY_MUSIC_GAME_OVER
+        LD HL,AY_MUSIC_VICTORY
         CALL AY_PLAY
-    ELSE
-        LD HL,MELODY_GAME_OVER
-        CALL MELODY_PLAY
     ENDIF
     EI
     LD B,150
@@ -128,13 +128,12 @@ SHOW_GAME_OVER:
     LD DE,MENU_BACK_TO_TITLE
     CALL MENU_PRINT_TEXT
 
-    ; AY ending advances in IM2; beeper is the 48K fallback.
+    ; Beeper loss phrase first, then independent AY loss theme.
+    LD HL,MELODY_GAME_OVER
+    CALL MELODY_PLAY
     IF AY_MUSIC_ENABLED
         LD HL,AY_MUSIC_GAME_OVER
         CALL AY_PLAY
-    ELSE
-        LD HL,MELODY_GAME_OVER
-        CALL MELODY_PLAY
     ENDIF
     EI
     LD B,GAME_OVER_FRAMES

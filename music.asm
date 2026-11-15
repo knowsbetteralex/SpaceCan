@@ -17,4 +17,7 @@ AY_MUSIC_GAME:
 
 AY_MUSIC_GAME_OVER:
     INCBIN "assets/music/game_over.aym"
+
+AY_MUSIC_VICTORY:
+    INCBIN "assets/music/victory.aym"
     ENDIF

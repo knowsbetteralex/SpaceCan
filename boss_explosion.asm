@@ -27,7 +27,7 @@ START_BOSS_DEATH:
     LD A,SFX_BOSS
     CALL SFX_START
     IF AY_MUSIC_ENABLED
-        CALL AY_STOP             ; AY noise burst is installed separately
+        CALL AY_BOSS_BOOM_START  ; dedicated noise-C explosion via IM2
     ENDIF
     JP BOSS_DEATH_FLASH_BORDER
 

@@ -59,7 +59,7 @@ SHOOT_TEXT_Y          EQU 2
 SHOOT_TEXT_WIDTH      EQU 6     ; "SHOOT!"
 SHOOT_BLINK_MASK      EQU #10   ; 16 video frames on, 16 off
 PRESSURE_SEGMENTS     EQU 10    ; 10 penalties fill the gauge and cost a life
-GAME_OVER_FRAMES     EQU 50    ; ~1 second after the Game Over melody
+GAME_OVER_FRAMES     EQU 150  ; allow 3 seconds for AY ending    ; ~1 second after the Game Over melody
 SHIP_MOVE_DELAY      EQU 2
 SHIP_BANK_DELAY      EQU 5    ; ticks between 8x8 banking poses
 SHIP_BANK_HOLD       EQU 14   ; keep tilt after releasing O/P
