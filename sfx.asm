@@ -2,12 +2,12 @@
 ; SpaceCan: short priority SFX + optional idle engine on ZX #FE.
 ; No AY access here: AY music may play at the same time.
 ;
-; SFX_START: A=1..5. Clobbers AF,DE,HL, preserves BC/IX.
+; SFX_START: A=1..6. Clobbers AF,DE,HL, preserves BC/IX.
 ; SFX_TICK: one bounded SFX or engine packet/frame; clobbers AF,BC,DE,HL.
 ; When no SFX is active, optional engine buzz is heard in PLAYING/BOSS.
 ; Ship explosion uses a dedicated irregular pulse routine.
 ; SFX_STOP:  silence immediately, preserving border (clobbers AF).
-; Priority: SHIP > PENALTY > KILL > HIT > SHOT.
+; Priority: BOSS > SHIP > PENALTY > KILL > HIT > SHOT.
 ; Only called from mainline; beeper pulses are atomic vs IM2.
 ; Port #FE lower bits: BORDER (0..2), MIC (3), EAR (4).
 ; -------------------------------------------------------------
