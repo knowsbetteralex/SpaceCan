@@ -55,6 +55,7 @@ BOSS_RESET_ENTRY:
     LD (BOSS_FIRE_TIMER),A
     XOR A
     LD (BOSS_SHOT_CLOCK),A       ; reset player cooldown per life
+    LD (BOSS_FIGHT_READY),A     ; lock player fire until first boss volley
     LD A,1
     LD (BOSS_ACTIVE),A
     LD (BOSS_DIRTY),A
@@ -62,6 +63,8 @@ BOSS_RESET_ENTRY:
     LD A,STATE_BOSS
     LD (GAME_STATE),A
     RET
+
+BOSS_FIGHT_READY: DB 0
 
 ; Leave DRAWN flag alone: renderer must erase old asteroid pixels.
 BOSS_DISABLE_ASTEROIDS:
@@ -117,7 +120,10 @@ UPDATE_BOSS:
     DEC (HL)
     RET NZ
     LD (HL),BOSS_FIRE_DELAY
-    JP BOSS_FIRE_PAIR
+    CALL BOSS_FIRE_PAIR
+    LD A,1
+    LD (BOSS_FIGHT_READY),A     ; the first enemy volley opens the duel
+    RET
 
 ; Dual cannons target two adjacent lanes around the player's X.
 ; Targets are snapshots. Left/right trajectories never cross.
@@ -194,9 +200,9 @@ CHECK_BULLET_BOSS:
 .HIT:
     ; The boss must reach the centre before its HP can be damaged.
     ; Shots during entry hit the armour but do not reduce its gauge.
-    LD A,(BOSS_Y)
-    CP BOSS_TARGET_Y
-    CALL Z,BOSS_TAKE_HIT
+    LD A,(BOSS_FIGHT_READY)
+    OR A
+    CALL NZ,BOSS_TAKE_HIT
     CALL DEACTIVATE_BULLET
     SCF
     RET

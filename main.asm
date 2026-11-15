@@ -249,6 +249,7 @@ MAIN_LOOP:
     INCLUDE "logic.asm"
     INCLUDE "bullets.asm"
     INCLUDE "hostile_bullets.asm"
+    INCLUDE "impacts.asm"
     INCLUDE "enemies.asm"
     INCLUDE "boss.asm"
     INCLUDE "starfield.asm"

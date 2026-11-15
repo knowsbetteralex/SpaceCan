@@ -19,6 +19,9 @@ FIRE_BULLET:
     LD A,(GAME_STATE)
     CP STATE_BOSS
     JR NZ,.CHECK_POOL
+    LD A,(BOSS_FIGHT_READY)
+    OR A
+    RET Z                         ; boss fires first
     LD A,(BOSS_SHOT_CLOCK)
     OR A
     RET NZ

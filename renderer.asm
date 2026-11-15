@@ -21,6 +21,7 @@ RENDER_FRAME:
     CALL RENDER_ERASE_HOSTILE_BULLETS
     CALL RENDER_ERASE_ENEMIES
     CALL RENDER_ERASE_BOSS
+    CALL RENDER_ERASE_BULLET_IMPACTS
 
     LD A,(SHIP_DIRTY)
     OR A
@@ -93,6 +94,7 @@ RENDER_FRAME:
     CALL RENDER_DRAW_BOSS
     CALL RENDER_DRAW_BULLETS
     CALL RENDER_DRAW_HOSTILE_BULLETS
+    CALL RENDER_DRAW_BULLET_IMPACTS
 
     ; Final pass: OR star bits into the finished image, including
     ; asteroid pixels when a star happens to cross one.
