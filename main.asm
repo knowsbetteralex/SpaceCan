@@ -92,6 +92,7 @@ STATE_GAME_OVER      EQU 4
 STATE_PAUSED         EQU 5
 STATE_BOSS           EQU 6
 STATE_VICTORY        EQU 7
+STATE_BOSS_DEATH     EQU 8
 PAUSE_TEXT_Y         EQU 12
 PAUSE_TEXT_X         EQU 13
 PAUSE_TEXT_WIDTH     EQU 6
@@ -206,9 +207,13 @@ MAIN_LOOP:
     CP STATE_VICTORY
     JP Z,SHOW_VICTORY
 
-    ; Pause scan runs before rendering and game logic. While paused,
-    ; only HALT and ENTER are processed, so all animation clocks freeze.
+    ; Boss death is a non-interactive cinematic: no pause or inputs.
+    LD A,(GAME_STATE)
+    CP STATE_BOSS_DEATH
+    JR Z,.RENDER_ACTIVE
+    ; Pause scan runs before rendering and game logic.
     CALL HANDLE_PAUSE_KEY
+.RENDER_ACTIVE:
     LD A,(GAME_STATE)
     CP STATE_PAUSED
     JR Z,.FRAME_END
@@ -222,11 +227,18 @@ MAIN_LOOP:
     CP STATE_PLAYING
     JR Z,.ACTIVE
     CP STATE_BOSS
-    JR NZ,.EXPLODING
+    JR Z,.ACTIVE
+    CP STATE_BOSS_DEATH
+    JR Z,.BOSS_DEATH
+    JR .EXPLODING
 .ACTIVE:
     CALL READ_INPUT
     DEBUG_PHASE DBG_LOGIC_COLOUR
     CALL UPDATE_GAME
+    JR .FRAME_SOUND
+.BOSS_DEATH:
+    DEBUG_PHASE DBG_LOGIC_COLOUR
+    CALL UPDATE_BOSS_DEATH
     JR .FRAME_SOUND
 .EXPLODING:
     ; The only moving item during this mode is the ship explosion.
@@ -252,6 +264,7 @@ MAIN_LOOP:
     INCLUDE "impacts.asm"
     INCLUDE "enemies.asm"
     INCLUDE "boss.asm"
+    INCLUDE "boss_explosion.asm"
     INCLUDE "starfield.asm"
     INCLUDE "renderer.asm"
     INCLUDE "graphics.asm"

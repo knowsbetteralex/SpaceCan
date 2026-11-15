@@ -1,0 +1,300 @@
+; Boss victory cinematic: 10 stages, expanding 9x8 character cells.
+; Five 8x8 bitmap textures, indexed by sparse per-stage matrices.
+; Paint only after the existing dirty-cell background restore.
+BOSS_DEATH_LEFT EQU 11
+BOSS_DEATH_TOP EQU 4
+BOSS_DEATH_WIDTH EQU 9
+BOSS_DEATH_HEIGHT EQU 8
+BOSS_DEATH_TICKS EQU 8
+BOSS_DEATH_FRAMES EQU 10
+
+START_BOSS_DEATH:
+    XOR A
+    LD (BOSS_ACTIVE),A
+    LD (BOSS_DEATH_FRAME),A
+    LD (BOSS_DEATH_DRAWN),A
+    LD (BOSS_DEATH_SHOTS_CLEARED),A
+    LD A,1
+    LD (BOSS_DIRTY),A
+    LD (BOSS_DEATH_ACTIVE),A
+    LD (BOSS_DEATH_DIRTY),A
+    LD A,BOSS_DEATH_TICKS
+    LD (BOSS_DEATH_TIMER),A
+    LD A,(SFX_FE_BASE)
+    LD (BOSS_DEATH_BORDER_SAVE),A
+    LD A,STATE_BOSS_DEATH
+    LD (GAME_STATE),A
+    LD A,SFX_BOSS
+    CALL SFX_START
+    IF AY_MUSIC_ENABLED
+        CALL AY_STOP             ; AY noise burst is installed separately
+    ENDIF
+    JP BOSS_DEATH_FLASH_BORDER
+
+UPDATE_BOSS_DEATH:
+    LD A,(BOSS_DEATH_SHOTS_CLEARED)
+    OR A
+    CALL Z,BOSS_DEATH_CLEAR_SHOTS
+    CALL UPDATE_BULLET_IMPACTS
+    LD HL,BOSS_DEATH_TIMER
+    DEC (HL)
+    RET NZ
+    LD (HL),BOSS_DEATH_TICKS
+    LD HL,BOSS_DEATH_FRAME
+    INC (HL)
+    LD A,(HL)
+    CP BOSS_DEATH_FRAMES
+    JR Z,.FINISH
+    LD A,1
+    LD (BOSS_DEATH_DIRTY),A
+    JP BOSS_DEATH_FLASH_BORDER
+.FINISH:
+    XOR A
+    LD (BOSS_DEATH_ACTIVE),A
+    LD A,1
+    LD (BOSS_DEATH_DIRTY),A
+    LD A,(BOSS_DEATH_BORDER_SAVE)
+    LD (SFX_FE_BASE),A
+    OUT (#FE),A
+    LD A,STATE_VICTORY
+    LD (GAME_STATE),A
+    RET
+
+; Last player bullet was deactivated by the collision caller before
+; the first cinematic update. Leave DRAWN intact until renderer erases.
+BOSS_DEATH_CLEAR_SHOTS:
+    LD A,1
+    LD (BOSS_DEATH_SHOTS_CLEARED),A
+    LD IX,BULLET_POOL
+    LD B,MAX_BULLETS
+.PLAYER:
+    XOR A
+    LD (IX+B_ACTIVE),A
+    LD A,1
+    LD (IX+B_DIRTY),A
+    LD DE,BULLET_SLOT_SIZE
+    ADD IX,DE
+    DJNZ .PLAYER
+    XOR A
+    LD (BULLET_COUNT),A
+    LD IX,HOSTILE_BULLET_POOL
+    LD B,MAX_HOSTILE_BULLETS
+.HOSTILE:
+    XOR A
+    LD (IX+HB_ACTIVE),A
+    LD A,1
+    LD (IX+HB_DIRTY),A
+    LD DE,HOSTILE_BULLET_SIZE
+    ADD IX,DE
+    DJNZ .HOSTILE
+    RET
+
+BOSS_DEATH_FLASH_BORDER:
+    LD A,(BOSS_DEATH_FRAME)
+    AND 3
+    LD E,A
+    LD D,0
+    LD HL,BOSS_DEATH_BORDER_COLOURS
+    ADD HL,DE
+    LD A,(HL)
+    LD (SFX_FE_BASE),A
+    OUT (#FE),A
+    RET
+
+RENDER_ERASE_BOSS_DEATH:
+    LD A,(BOSS_DEATH_DIRTY)
+    OR A
+    RET Z
+    LD BC,#040B                 ; Y=4 X=11
+    LD DE,#0908                 ; width=9 height=8
+    JP STARFIELD_MARK_RECT
+
+RENDER_DRAW_BOSS_DEATH:
+    LD A,(BOSS_DEATH_DIRTY)
+    OR A
+    RET Z
+    XOR A
+    LD (BOSS_DEATH_DIRTY),A
+    LD A,(BOSS_DEATH_ACTIVE)
+    OR A
+    RET Z
+    LD A,(BOSS_DEATH_FRAME)
+    ADD A,A
+    LD E,A
+    LD D,0
+    LD HL,BOSS_DEATH_FRAME_TABLE
+    ADD HL,DE
+    LD E,(HL)
+    INC HL
+    LD D,(HL)
+    LD (BOSS_DEATH_PTR),DE
+    LD B,BOSS_DEATH_TOP
+.ROW:
+    LD C,BOSS_DEATH_LEFT
+.COL:
+    LD HL,(BOSS_DEATH_PTR)
+    LD A,(HL)
+    INC HL
+    LD (BOSS_DEATH_PTR),HL
+    OR A
+    JR Z,.NEXT
+    PUSH BC
+    DEC A
+    LD (BOSS_DEATH_TILE_INDEX),A
+    CALL GET_SCREEN_ADDR
+    PUSH HL
+    LD A,(BOSS_DEATH_TILE_INDEX)
+    LD E,A
+    LD D,0
+    LD HL,BOSS_DEATH_ATTRS
+    ADD HL,DE
+    LD A,(HL)
+    LD (BOSS_DEATH_ATTR),A
+    POP HL
+    LD DE,BOSS_DEATH_ATTR
+    CALL RESTORE_ATTR_1_1
+    PUSH HL
+    LD A,(BOSS_DEATH_TILE_INDEX)
+    ADD A,A
+    ADD A,A
+    ADD A,A
+    LD E,A
+    LD D,0
+    LD HL,BOSS_DEATH_BITMAPS
+    ADD HL,DE
+    EX DE,HL
+    POP HL
+    CALL DRAW_1_1
+    POP BC
+.NEXT:
+    INC C
+    LD A,C
+    CP BOSS_DEATH_LEFT+BOSS_DEATH_WIDTH
+    JR NZ,.COL
+    INC B
+    LD A,B
+    CP BOSS_DEATH_TOP+BOSS_DEATH_HEIGHT
+    JR NZ,.ROW
+    LD A,1
+    LD (BOSS_DEATH_DRAWN),A
+    RET
+
+BOSS_DEATH_ACTIVE: DB 0
+BOSS_DEATH_DIRTY: DB 0
+BOSS_DEATH_DRAWN: DB 0
+BOSS_DEATH_FRAME: DB 0
+BOSS_DEATH_TIMER: DB BOSS_DEATH_TICKS
+BOSS_DEATH_SHOTS_CLEARED: DB 0
+BOSS_DEATH_BORDER_SAVE: DB 1
+BOSS_DEATH_PTR: DW 0
+BOSS_DEATH_TILE_INDEX: DB 0
+BOSS_DEATH_ATTR: DB #47
+BOSS_DEATH_BORDER_COLOURS: DB 7,6,2,1
+BOSS_DEATH_ATTRS: DB #47,#46,#42,#45,#41
+BOSS_DEATH_BITMAPS:
+    DB #18,#3C,#7E,#FF,#FF,#7E,#3C,#18
+    DB #24,#7E,#FF,#DB,#FF,#7E,#5A,#24
+    DB #81,#42,#24,#18,#18,#24,#42,#81
+    DB #80,#04,#20,#01,#08,#40,#02,#10
+    DB #00,#20,#04,#00,#80,#01,#08,#00
+BOSS_DEATH_FRAME_TABLE:
+    DW BOSS_DEATH_ART_0,BOSS_DEATH_ART_1,BOSS_DEATH_ART_2,BOSS_DEATH_ART_3,BOSS_DEATH_ART_4,BOSS_DEATH_ART_5,BOSS_DEATH_ART_6,BOSS_DEATH_ART_7,BOSS_DEATH_ART_8,BOSS_DEATH_ART_9
+BOSS_DEATH_ART_0:
+    DB 0,0,0,0,0,0,0,0,0
+    DB 0,0,0,0,0,0,0,0,0
+    DB 0,0,0,0,0,0,0,0,0
+    DB 0,0,0,1,1,1,0,0,0
+    DB 0,0,0,1,1,1,0,0,0
+    DB 0,0,0,0,0,0,0,0,0
+    DB 0,0,0,0,0,0,0,0,0
+    DB 0,0,0,0,0,0,0,0,0
+
+BOSS_DEATH_ART_1:
+    DB 0,0,0,0,0,0,0,0,0
+    DB 0,0,0,4,4,4,0,0,0
+    DB 0,0,4,2,2,2,0,0,0
+    DB 0,0,2,1,1,1,2,0,0
+    DB 0,4,2,1,1,1,2,0,0
+    DB 0,0,0,2,2,2,0,0,0
+    DB 0,0,0,0,4,0,0,0,0
+    DB 0,0,0,0,0,0,0,0,0
+
+BOSS_DEATH_ART_2:
+    DB 0,0,0,0,0,0,0,0,0
+    DB 0,0,0,0,2,4,4,0,0
+    DB 0,0,2,3,2,3,2,0,0
+    DB 0,4,2,1,1,1,3,0,0
+    DB 0,4,3,1,1,1,3,4,0
+    DB 0,0,3,3,3,3,3,0,0
+    DB 0,0,4,0,2,0,4,0,0
+    DB 0,0,0,0,0,0,0,0,0
+
+BOSS_DEATH_ART_3:
+    DB 0,0,4,3,0,3,0,0,0
+    DB 0,0,2,2,2,2,3,3,0
+    DB 0,4,2,3,3,2,3,0,4
+    DB 3,3,3,2,2,2,3,3,4
+    DB 4,2,3,2,2,2,2,3,0
+    DB 0,0,2,2,2,2,2,0,0
+    DB 0,4,3,3,2,3,2,4,0
+    DB 0,0,3,3,3,3,3,0,0
+
+BOSS_DEATH_ART_4:
+    DB 0,0,3,3,4,3,3,0,0
+    DB 0,4,4,4,3,3,3,3,0
+    DB 3,3,3,4,2,4,3,4,3
+    DB 3,3,2,2,2,2,2,3,3
+    DB 3,3,2,2,4,2,4,3,4
+    DB 4,4,4,4,4,4,4,4,4
+    DB 0,4,3,3,3,3,3,3,0
+    DB 0,0,3,3,3,3,3,0,0
+
+BOSS_DEATH_ART_5:
+    DB 0,3,4,3,3,5,3,4,0
+    DB 4,3,3,3,3,3,3,5,5
+    DB 3,4,3,4,5,3,5,3,4
+    DB 5,5,5,5,2,4,4,4,4
+    DB 4,3,4,3,2,3,3,5,3
+    DB 3,3,3,3,3,3,3,3,3
+    DB 3,4,3,4,3,4,3,4,3
+    DB 0,5,5,5,5,5,5,3,0
+
+BOSS_DEATH_ART_6:
+    DB 0,0,0,5,5,4,5,0,0
+    DB 0,5,5,5,5,5,5,4,0
+    DB 5,0,5,0,5,5,4,5,0
+    DB 4,4,4,4,4,0,0,0,0
+    DB 0,5,0,5,0,5,0,5,5
+    DB 5,5,5,5,5,5,5,5,5
+    DB 0,0,5,0,5,0,5,0,0
+    DB 0,0,4,4,4,4,5,0,0
+
+BOSS_DEATH_ART_7:
+    DB 0,0,3,5,0,5,0,3,0
+    DB 0,0,0,0,0,0,5,5,0
+    DB 0,3,0,3,5,0,5,0,3
+    DB 5,5,5,5,5,3,3,3,3
+    DB 3,0,3,0,3,5,3,5,0
+    DB 0,0,0,0,0,0,0,0,0
+    DB 0,3,0,3,0,3,0,3,0
+    DB 0,5,5,5,5,5,5,5,0
+
+BOSS_DEATH_ART_8:
+    DB 0,4,0,0,5,0,0,0,0
+    DB 5,5,5,4,0,0,0,0,0
+    DB 4,0,0,5,0,5,0,4,0
+    DB 0,0,0,0,0,0,0,0,0
+    DB 0,0,0,0,5,0,5,0,5
+    DB 4,4,4,4,4,4,4,4,4
+    DB 0,5,0,0,0,0,0,0,0
+    DB 0,0,0,0,0,0,0,0,0
+
+BOSS_DEATH_ART_9:
+    DB 0,0,0,5,0,0,0,0,0
+    DB 0,0,0,0,0,5,5,0,0
+    DB 0,0,5,0,5,0,0,0,0
+    DB 0,0,0,0,0,0,0,0,0
+    DB 0,5,0,5,0,5,0,5,0
+    DB 0,0,0,0,0,0,0,0,0
+    DB 5,0,5,0,5,0,5,0,0
+    DB 0,0,0,0,0,0,5,5,0

@@ -16,6 +16,7 @@ SFX_HIT     EQU 2
 SFX_KILL    EQU 3
 SFX_PENALTY EQU 4
 SFX_SHIP    EQU 5
+SFX_BOSS    EQU 6
 
 ; Start/replace a sound only if it is not lower priority.
 SFX_START:
@@ -67,6 +68,8 @@ SFX_TICK:
         RET
     ENDIF
 .SFX:
+    CP SFX_BOSS
+    JP Z,SFX_BOSS_TICK
     CP SFX_SHIP
     JP Z,SFX_SHIP_TICK            ; low irregular noise, not tonal sweep
 
@@ -217,6 +220,67 @@ SFX_SHIP_TICK:
     LD (SFX_ACTIVE),A
     RET
 
+; Boss finale: hot crack, rolling blast, scattered debris.
+; 80 frames, with bounded 1..3 noise pulses each frame.
+SFX_BOSS_TICK:
+    LD A,(SFX_FRAMES)
+    CP 16
+    JR NC,.PLAY
+    AND 1
+    JR NZ,.ADVANCE
+.PLAY:
+    DI
+    LD A,(SFX_FE_BASE)
+    AND #0F
+    LD D,A
+    OR #10
+    LD E,A
+    LD A,(SFX_FRAMES)
+    LD B,3
+    CP 52
+    JR NC,.PULSE
+    LD B,2
+    CP 24
+    JR NC,.PULSE
+    LD B,1
+.PULSE:
+    LD A,E
+    OUT (#FE),A
+    CALL SFX_SHIP_RANDOM
+    AND #3F
+    LD C,A
+    LD A,(SFX_PERIOD)
+    ADD A,C
+.HIGH:
+    DEC A
+    JR NZ,.HIGH
+    LD A,D
+    OUT (#FE),A
+    CALL SFX_SHIP_RANDOM
+    AND #3F
+    LD C,A
+    LD A,(SFX_PERIOD)
+    ADD A,C
+.LOW:
+    DEC A
+    JR NZ,.LOW
+    DJNZ .PULSE
+    EI
+.ADVANCE:
+    LD HL,SFX_FRAMES
+    DEC (HL)
+    JR Z,.END
+    LD A,(SFX_PERIOD)
+    CP 160
+    RET NC
+    INC A
+    LD (SFX_PERIOD),A
+    RET
+.END:
+    XOR A
+    LD (SFX_ACTIVE),A
+    RET
+
 ; Galois noise generator, advanced twice per audible pulse.
 ; OUT: A=new noise byte. Preserves BC, DE and HL.
 SFX_SHIP_RANDOM:
@@ -235,6 +299,7 @@ SFX_PRESETS:
     DB 9,19,5                      ; noisy asteroid destruction
     DB 8,14,2                      ; two-part alarm
     DB 30,126,3                    ; low noisy ship blast, separate path
+    DB 80,72,1                     ; boss: 1.6 seconds of deep noise
 
 SFX_ACTIVE:  DB 0
 SFX_FRAMES:  DB 0

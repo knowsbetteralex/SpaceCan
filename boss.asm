@@ -242,12 +242,7 @@ BOSS_TAKE_HIT:
     LD A,SFX_HIT
     JP SFX_START
 .DEFEATED:
-    XOR A
-    LD (BOSS_ACTIVE),A
-    LD A,STATE_VICTORY
-    LD (GAME_STATE),A
-    LD A,SFX_KILL
-    JP SFX_START
+    JP START_BOSS_DEATH          ; victory only after the cinematic
 
 RENDER_ERASE_BOSS:
     LD A,(BOSS_DIRTY)
