@@ -45,8 +45,8 @@ SPEED_STAGE_COUNT    EQU 5     ; engine supports 1 / 1.5 / 2 / 2.5 / 3
 ; SCORE is 24-bit, so both limits can be set as high as 999999.
 ; The demo skips intermediate 1.5x / 2.5x / 3x stages.
 ; =============================================================
-DEMO_SPEEDUP_SCORE   EQU 4096
-DEMO_BOSS_SCORE      EQU 8192
+DEMO_SPEEDUP_SCORE   EQU 2048
+DEMO_BOSS_SCORE      EQU 4096
     ASSERT DEMO_SPEEDUP_SCORE >= 0
     ASSERT DEMO_SPEEDUP_SCORE < DEMO_BOSS_SCORE
     ASSERT DEMO_BOSS_SCORE <= 999999
