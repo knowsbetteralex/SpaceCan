@@ -20,7 +20,7 @@ class BossFinaleTests(unittest.TestCase):
         bullets = src("bullets.asm")
         self.assertIn("LD (BOSS_FIGHT_READY),A     ; lock player fire", boss)
         self.assertRegex(
-            boss, r"CALL BOSS_FIRE_PAIR\s+LD A,1\s+LD \(BOSS_FIGHT_READY\),A"
+            boss, r"JP BOSS_FIRE_DISPATCH"
         )
         self.assertRegex(
             bullets,
@@ -28,6 +28,7 @@ class BossFinaleTests(unittest.TestCase):
             r"LD A,\(BOSS_FIGHT_READY\)\s+OR A\s+RET Z",
         )
         self.assertIn("CALL NZ,BOSS_TAKE_HIT", boss)
+        self.assertIn("LD (BOSS_FIGHT_READY),A", src("hostile_bullets.asm"))
 
     def test_clash_effect_has_own_pool_and_dirty_erase(self):
         impacts = src("impacts.asm")

@@ -1,7 +1,7 @@
 ; -------------------------------------------------------------
 ; Shared hostile bullets (boss now, manoeuvring shooters later).
-; 6 slots x 8 bytes, one 8x8 sprite, 1 row per 4 gameplay ticks.
-; Each shot remembers the player's position when fired.
+; 12 slots x 10 bytes, one 8x8 sprite per shot.
+; Normal/plasma/homing types share the same movement and dirty renderer.
 ; -------------------------------------------------------------
 
 HB_ACTIVE  EQU 0
@@ -12,6 +12,11 @@ HB_DRAW_X  EQU 4
 HB_DRAW_Y  EQU 5
 HB_DIRTY   EQU 6
 HB_TARGET_X EQU 7
+HB_KIND     EQU 8
+HB_STEP     EQU 9
+HB_KIND_NORMAL EQU 0
+HB_KIND_PLASMA EQU 1
+HB_KIND_HOMING EQU 2
 
 RESET_HOSTILE_BULLETS:
     LD HL,HOSTILE_BULLET_POOL
@@ -42,9 +47,14 @@ SPAWN_HOSTILE_BULLET:
     LD (IX+HB_X),C
     LD (IX+HB_Y),B
     LD (IX+HB_TARGET_X),E
+    LD A,(HOSTILE_SPAWN_KIND)
+    LD (IX+HB_KIND),A
+    XOR A
+    LD (IX+HB_STEP),A
     LD A,1
     LD (IX+HB_ACTIVE),A
     LD (IX+HB_DIRTY),A
+    LD (BOSS_FIGHT_READY),A    ; actual spawn, not plasma warmup
     JR .DONE
 .NEXT:
     ; Save requested YX in BC and retain D as the slot counter.
@@ -98,6 +108,7 @@ UPDATE_HOSTILE_SLOT:
     JR NC,.EXPIRE
     INC A
     LD (IX+HB_Y),A
+    CALL HOSTILE_ADJUST_HOMING
 
     ; One horizontal cell per vertical step, toward launch target.
     ; No live homing: player can dodge the aimed projectile.
@@ -145,6 +156,25 @@ UPDATE_HOSTILE_SLOT:
 .EXPIRE:
     JP DEACTIVATE_HOSTILE_SLOT
 
+; Homing adjusts its goal every third vertical step, but stops
+; tracking for the final five rows so a dodge stays possible.
+HOSTILE_ADJUST_HOMING:
+    LD A,(IX+HB_KIND)
+    CP HB_KIND_HOMING
+    RET NZ
+    LD A,(IX+HB_Y)
+    CP PLAYFIELD_BOTTOM-5
+    RET NC
+    INC (IX+HB_STEP)
+    LD A,(IX+HB_STEP)
+    CP 3
+    RET C
+    XOR A
+    LD (IX+HB_STEP),A
+    LD A,(SHIP_NEW_POS)
+    LD (IX+HB_TARGET_X),A
+    RET
+
 DEACTIVATE_HOSTILE_SLOT:
     XOR A
     LD (IX+HB_ACTIVE),A
@@ -179,15 +209,20 @@ CHECK_BULLET_HOSTILES:
     CP (IY+HB_X)
     JR NZ,.SKIP
 .HIT:
+    ; The plasma sphere survives contact. Other shots annihilate.
+    LD A,(IY+HB_KIND)
+    CP HB_KIND_PLASMA
+    JR Z,.SPARK_ONLY
+    XOR A
+    LD (IY+HB_ACTIVE),A
+    LD A,1
+    LD (IY+HB_DIRTY),A
+.SPARK_ONLY:
     LD B,(IY+HB_Y)
     LD C,(IY+HB_X)
     CALL SPAWN_BULLET_IMPACT
     LD A,SFX_HIT
     CALL SFX_START
-    XOR A
-    LD (IY+HB_ACTIVE),A
-    LD A,1
-    LD (IY+HB_DIRTY),A
     POP IY
     CALL DEACTIVATE_BULLET
     SCF
@@ -255,10 +290,28 @@ RENDER_DRAW_HOSTILE_BULLETS:
     LD B,(IX+HB_Y)
     LD C,(IX+HB_X)
     CALL GET_SCREEN_ADDR
+    LD A,(IX+HB_KIND)
+    CP HB_KIND_PLASMA
+    JR Z,.PLASMA
+    CP HB_KIND_HOMING
+    JR Z,.HOMING
     LD DE,HOSTILE_BULLET_ATTR
     CALL RESTORE_ATTR_1_1
     LD DE,HOSTILE_BULLET_SPRITE
     CALL DRAW_1_1
+    JR .DRAWN
+.PLASMA:
+    LD DE,HOSTILE_PLASMA_ATTR
+    CALL RESTORE_ATTR_1_1
+    LD DE,HOSTILE_PLASMA_SPRITE
+    CALL DRAW_1_1
+    JR .DRAWN
+.HOMING:
+    LD DE,HOSTILE_HOMING_ATTR
+    CALL RESTORE_ATTR_1_1
+    LD DE,HOSTILE_HOMING_SPRITE
+    CALL DRAW_1_1
+.DRAWN:
     LD A,(IX+HB_X)
     LD (IX+HB_DRAW_X),A
     LD A,(IX+HB_Y)
@@ -273,6 +326,7 @@ RENDER_DRAW_HOSTILE_BULLETS:
     RET
 
 HOSTILE_MOVE_NOW: DB 0
+HOSTILE_SPAWN_KIND: DB HB_KIND_NORMAL
 HOSTILE_BULLET_ATTR: DB #42
 HOSTILE_BULLET_SPRITE:
     DB %00011000
@@ -283,3 +337,26 @@ HOSTILE_BULLET_SPRITE:
     DB %00111100
     DB %00011000
     DB %00000000
+
+; Distinct projectiles: magenta, unsmashable plasma and yellow tracker.
+HOSTILE_PLASMA_ATTR: DB #43
+HOSTILE_PLASMA_SPRITE:
+    DB %00100100
+    DB %01111110
+    DB %11111111
+    DB %11011011
+    DB %11011011
+    DB %11111111
+    DB %01111110
+    DB %00100100
+
+HOSTILE_HOMING_ATTR: DB #46
+HOSTILE_HOMING_SPRITE:
+    DB %00011000
+    DB %00111100
+    DB %01111110
+    DB %11011011
+    DB %11111111
+    DB %01111110
+    DB %00100100
+    DB %01000010

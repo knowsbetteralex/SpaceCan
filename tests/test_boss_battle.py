@@ -56,7 +56,7 @@ class BossFightChecks(unittest.TestCase):
     def test_two_cannons_are_aimed_and_targets_are_frozen(self):
         hostile = asm("hostile_bullets.asm")
         boss = asm("boss.asm")
-        self.assertEqual(equ("HOSTILE_BULLET_SIZE"), 8)
+        self.assertEqual(equ("HOSTILE_BULLET_SIZE"), 10)
         self.assertIn("HB_TARGET_X EQU 7", hostile)
         self.assertIn("LD (IX+HB_TARGET_X),E", hostile)
         self.assertIn("LD A,(IX+HB_TARGET_X)", hostile)

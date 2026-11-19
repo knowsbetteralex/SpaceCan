@@ -5,7 +5,7 @@
 READ_INPUT:
     CALL READ_SHIP_HORIZONTAL
     CALL READ_FIRE_KEY
-    RET
+    JP BOSS_READ_ATTACK_KEYS
 
 ; The 8x8 ship stays within X=8..23, Y=22, now moving in 4px steps.
 ; Banking is independent:

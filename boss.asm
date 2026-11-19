@@ -56,7 +56,17 @@ BOSS_RESET_ENTRY:
     XOR A
     LD (BOSS_SHOT_CLOCK),A       ; reset player cooldown per life
     LD (BOSS_FIGHT_READY),A     ; lock player fire until first boss volley
+    LD (BOSS_MODE_KEY_HELD),A
+    LD (BOSS_ATTACK_CYCLE),A
+    LD (BOSS_DOUBLE_WAIT),A
+    LD (BOSS_PLASMA_CHARGE),A
+    LD (BOSS_STILL_FRAMES),A
+    LD A,(SHIP_NEW_POS)
+    LD (BOSS_STILL_LAST_X),A
+    LD A,(SHIP_HALF_POS)
+    LD (BOSS_STILL_LAST_HALF),A
     LD A,1
+    LD (BOSS_MODE_DIRTY),A
     LD (BOSS_ACTIVE),A
     LD (BOSS_DIRTY),A
     LD (GAUGE_DIRTY),A
@@ -104,6 +114,7 @@ UPDATE_BOSS:
     LD (BOSS_DIRTY),A
     RET
 .CENTERED:
+    CALL BOSS_ATTACK_TICK        ; pending shots and stationary detection
     CALL BOSS_UPDATE_HALF_BLINK
     LD HL,BOSS_ANIM_TIMER
     DEC (HL)
@@ -120,10 +131,7 @@ UPDATE_BOSS:
     DEC (HL)
     RET NZ
     LD (HL),BOSS_FIRE_DELAY
-    CALL BOSS_FIRE_PAIR
-    LD A,1
-    LD (BOSS_FIGHT_READY),A     ; the first enemy volley opens the duel
-    RET
+    JP BOSS_FIRE_DISPATCH      ; first actual spawn opens the duel
 
 ; Dual cannons target two adjacent lanes around the player's X.
 ; Targets are snapshots. Left/right trajectories never cross.
@@ -325,7 +333,17 @@ DRAW_BOSS_ROW:
     LD A,#45                     ; bright cyan wings
     LD (HL),A
     INC L
-    LD A,#42                     ; red cockpit
+    ; Plasma charge makes the cockpit flash before the orb launches.
+    LD A,(BOSS_PLASMA_CHARGE)
+    OR A
+    LD A,#42                     ; normal red cockpit
+    JR Z,.COCKPIT
+    LD A,(BOSS_PLASMA_CHARGE)
+    AND 2
+    LD A,#47                     ; alternating white/red
+    JR NZ,.COCKPIT
+    LD A,#42
+.COCKPIT:
     LD (HL),A
     INC L
     LD A,#45

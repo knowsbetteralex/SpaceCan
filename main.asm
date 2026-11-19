@@ -74,8 +74,14 @@ BOSS_ENTRY_DELAY     EQU 5
 BOSS_ANIM_DELAY      EQU 12
 BOSS_FIRE_DELAY      EQU 45
 BOSS_PLAYER_SHOT_DELAY EQU 18 ; minimum gap in gameplay frames
-MAX_HOSTILE_BULLETS  EQU 6
-HOSTILE_BULLET_SIZE  EQU 8    ; extra fixed target-X byte
+MAX_HOSTILE_BULLETS  EQU 12
+HOSTILE_BULLET_SIZE  EQU 10   ; target, kind and homing counter
+; Testable boss patterns: 0=mix, 1=aim, 2=fan, 3=plasma,
+; 4=double, 5=homing, 6=adaptive (aim/plasma for idle ship).
+BOSS_DEFAULT_ATTACK_MODE EQU 0
+BOSS_STILL_LIMIT     EQU 100   ; two seconds at 50 Hz
+BOSS_PLASMA_WARMUP   EQU 12    ; visible warning before plasma
+BOSS_DOUBLE_DELAY    EQU 10    ; delayed follow-up
 HOSTILE_MOVE_DELAY   EQU 4
 ENEMY_SLOT_SIZE      EQU 15
 ENEMY_FRAME_DELAY    EQU 8     ; rotate once every 8 ticks
@@ -161,6 +167,8 @@ START_NEW_GAME:
     LD (PRESSURE_LEVEL),A        ; start with ten green segments
     LD (BOSS_STARTED),A
     LD (BOSS_ACTIVE),A
+    LD A,BOSS_DEFAULT_ATTACK_MODE
+    LD (BOSS_ATTACK_MODE),A
     LD A,1
     LD (SCROLL_SPEED),A
     LD A,START_LIVES
@@ -264,6 +272,7 @@ MAIN_LOOP:
     INCLUDE "impacts.asm"
     INCLUDE "enemies.asm"
     INCLUDE "boss.asm"
+    INCLUDE "boss_attacks.asm"
     INCLUDE "boss_explosion.asm"
     INCLUDE "starfield.asm"
     INCLUDE "renderer.asm"

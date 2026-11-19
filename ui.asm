@@ -101,7 +101,8 @@ RENDER_HUD:
     CALL RENDER_PRESSURE_GAUGE
 .WARNING:
     ; Called every active game frame, independent of HUD_DIRTY.
-    JP RENDER_SHOOT_WARNING
+    CALL RENDER_SHOOT_WARNING
+    JP RENDER_BOSS_ATTACK_MODE
 
 ; Warning between hearts (actual draw row Y=1) and gauge (Y=3).
 ; No bitmap writes from IM2: blink in the foreground, paused game freezes.
