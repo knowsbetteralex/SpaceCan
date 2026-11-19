@@ -6,6 +6,10 @@
 
 ### Изменения / What's new
 
+- Новая лаборатория стрельбы босса: переключайте **0=MIX, 1=AIM, 2=FAN, 3=PLASMA, 4=DOUBLE, 5=HOMING, 6=ADAPT** прямо во время боя / Press 0..6 during the boss encounter to switch attack patterns.
+- Фиолетовая плазма не уничтожается нашими пулями, после предупреждения кабины; жёлтые ракеты подруливают, двойные залпы догоняют друг друга / Invulnerable plasma, homing rounds, delayed double bursts, and spread volleys.
+- В смешанном режиме двойные залпы включаются при HP босса ≤ 50%, а стоящий 2 секунды игрок провоцирует плазму / MIX activates delayed bursts at half health and fires plasma at a camping player.
+
 - Десятикадровый взрыв босса (область до 72×64 пикселей) с отдельными шумовыми эффектами beeper и AY / 10-stage cinematic boss explosion with beeper and AY noise.
 - Поединок начинается после первого залпа босса; взаимное уничтожение пуль сопровождается анимацией / The boss fires first; bullet clashes animate.
 - Раздельные победная и проигрышная концовки для обоих аудиоустройств; биперная мелодия звучит первой / Distinct win and lose jingles for beeper and AY, played in that order.

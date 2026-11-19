@@ -61,7 +61,9 @@ BOSS_READ_ATTACK_KEYS:
     XOR A
     LD (BOSS_ATTACK_CYCLE),A
     LD (BOSS_DOUBLE_WAIT),A
+    LD (BOSS_PLASMA_CHARGE),A   ; cancel telegraph of previous mode
     LD A,1
+    LD (BOSS_DIRTY),A          ; restore normal cockpit colour
     LD (BOSS_MODE_DIRTY),A
     RET
 .RELEASE:

@@ -54,6 +54,12 @@ SPAWN_HOSTILE_BULLET:
     LD A,1
     LD (IX+HB_ACTIVE),A
     LD (IX+HB_DIRTY),A
+    ; Only a boss volley opens the duel; keep this shared pool
+    ; usable by ordinary shooters in later stages of SpaceCan.
+    LD A,(GAME_STATE)
+    CP STATE_BOSS
+    JR NZ,.DONE
+    LD A,1
     LD (BOSS_FIGHT_READY),A    ; actual spawn, not plasma warmup
     JR .DONE
 .NEXT:
