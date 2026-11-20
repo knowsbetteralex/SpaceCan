@@ -6,6 +6,9 @@
 
 ### Изменения / What's new
 
+- Добавлено `MOVE!`: после одной высоты коридора без движения предупреждение, через три — штраф. При движении, но отсутствии уничтоженных астероидов по-прежнему работает `SHOOT!` / New priority MOVE! idle movement warning and penalty after three corridor traversals; SHOOT! stays for missed kills while moving.
+- По-прежнему основной режим босса — `0:MIX` со всеми предыдущими атаками / MIX remains the default boss attack pattern.
+
 - Новая лаборатория стрельбы босса: переключайте **0=MIX, 1=AIM, 2=FAN, 3=PLASMA, 4=DOUBLE, 5=HOMING, 6=ADAPT** прямо во время боя / Press 0..6 during the boss encounter to switch attack patterns.
 - Фиолетовая плазма не уничтожается нашими пулями, после предупреждения кабины; жёлтые ракеты подруливают, двойные залпы догоняют друг друга / Invulnerable plasma, homing rounds, delayed double bursts, and spread volleys.
 - В смешанном режиме двойные залпы включаются при HP босса ≤ 50%, а стоящий 2 секунды игрок провоцирует плазму / MIX activates delayed bursts at half health and fires plasma at a camping player.

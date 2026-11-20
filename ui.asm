@@ -1,5 +1,5 @@
 ; -------------------------------------------------------------
-; SpaceCan Step 21: HUD + blinking SHOOT! warning after 1 missed screen.
+; SpaceCan: priority MOVE! / SHOOT! warnings after 1 idle screen.
 ; RLE artwork is unpacked once; only HUD numerals/attributes change.
 ; -------------------------------------------------------------
 DRAW_STATIC_UI:
@@ -104,28 +104,42 @@ RENDER_HUD:
     CALL RENDER_SHOOT_WARNING
     JP RENDER_BOSS_ATTACK_MODE
 
-; Warning between hearts (actual draw row Y=1) and gauge (Y=3).
-; No bitmap writes from IM2: blink in the foreground, paused game freezes.
-; OFF restores exact bitmap and attributes, rather than painting spaces.
+; Shared warning window between the hearts and gauge (Y=2, X=13..18).
+; MOVE! takes precedence over SHOOT!. SHOOT_VISIBLE: 0=hidden,
+; 1=SHOOT!, 2=MOVE!. A trailing space clears SHOOT!'s sixth glyph
+; when the warning switches without an intermediate blank frame.
+; No bitmap work from IM2; restored SCR bytes remain authoritative.
 RENDER_SHOOT_WARNING:
-    LD A,(SHOOT_WARNING_ACTIVE)
-    OR A
-    JR Z,.HIDE
     LD A,(GAME_STATE)
     CP STATE_PLAYING
     JR NZ,.HIDE
+    LD A,(MOVE_WARNING_ACTIVE)
+    OR A
+    JR Z,.CHECK_SHOOT
+    LD E,2                       ; MOVE! has higher priority
+    JR .BLINK
+.CHECK_SHOOT:
+    LD A,(SHOOT_WARNING_ACTIVE)
+    OR A
+    JR Z,.HIDE
+    LD E,1
+.BLINK:
     LD HL,SHOOT_BLINK_COUNTER
-    LD A,(HL)                    ; show 0..15, hide 16..31
+    LD A,(HL)
     INC (HL)
     AND SHOOT_BLINK_MASK
     JR NZ,.HIDE
     LD A,(SHOOT_VISIBLE)
-    OR A
-    RET NZ                       ; no redraw on an unchanged blink frame
-    LD A,1
+    CP E
+    RET Z                        ; right glyph already drawn
+    LD A,E
     LD (SHOOT_VISIBLE),A
-    LD BC,SHOOT_TEXT_Y*256+SHOOT_TEXT_X
+    CP 2
     LD DE,HUD_LABEL_SHOOT
+    JR NZ,.DRAW
+    LD DE,HUD_LABEL_MOVE
+.DRAW:
+    LD BC,SHOOT_TEXT_Y*256+SHOOT_TEXT_X
     CALL PRINT_TEXT
     LD HL,#5800+SHOOT_TEXT_Y*32+SHOOT_TEXT_X
     LD B,SHOOT_TEXT_WIDTH

@@ -3,6 +3,8 @@
 ; O/P: move; SPACE: fire on edge. Speed is score-driven.
 ; -------------------------------------------------------------
 READ_INPUT:
+    XOR A
+    LD (MOVE_CHANGED_THIS_TICK),A ; movement is measured by actual 4px steps
     CALL READ_SHIP_HORIZONTAL
     CALL READ_FIRE_KEY
     JP BOSS_READ_ATTACK_KEYS
@@ -74,6 +76,7 @@ READ_SHIP_HORIZONTAL:
     LD (SHIP_MOVE_TIMER),A
     JR .SET_BANK
 .MOVED:
+    CALL RESET_MOVE_TRAVEL       ; only real 4px movement counts, not a held key
     LD A,SHIP_MOVE_DELAY-1
     LD (SHIP_MOVE_TIMER),A
     LD A,1
@@ -404,46 +407,74 @@ SCORE_AT_LEAST:
     RET
 
 ; -------------------------------------------------------------
-; Pressure grows with world travel, NOT with count of escaped objects.
-; Every downward movement is one of 20 rows in a corridor crossing.
-; Three complete corridor heights (60 moves) with no asteroid kill
-; add ONE permanent red segment. Any kill resets only the travel timer,
-; never the accumulated gauge. At ten red segments a life is lost
-; through the normal ship-explosion/respawn sequence.
+; Two independent inactivity distances, in asteroid-world movement
+; rows (20 rows = 1 complete corridor traversal):
+;   MOVE!  after 20 rows without an actual horizontal 4px step;
+;   SHOOT! after 20 rows without an asteroid kill, as before.
+; At 60 rows a RED pressure segment is added. MOVE always wins:
+; the same world step cannot penalize both reasons. SHOOT penalties
+; are suppressed while MOVE is active; MOVE penalties also reset the
+; shooting distance to avoid an immediate second charge.
+; Both warnings latch across their own 60-row counter wrap.
 ; -------------------------------------------------------------
 UPDATE_MISS_PRESSURE:
-    LD A,(MISS_KILLED_THIS_TICK)
-    OR A
-    RET NZ                        ; a destruction restarted the timer
     LD A,(ENEMY_MOVE_NOW)
     OR A
-    RET Z                         ; count movement, not 50Hz frames
+    RET Z                         ; 50Hz frames alone do not count
+
+    ; Priority 1: sideways movement. A move on THIS frame does not
+    ; already consume a row of the new no-movement interval.
+    LD A,(MOVE_CHANGED_THIS_TICK)
+    OR A
+    JR NZ,.SHOOT_COUNT
+    LD HL,MOVE_TRAVEL_ROWS
+    INC (HL)
+    LD A,(HL)
+    CP MISS_SCREEN_ROWS
+    JR NZ,.MOVE_LIMIT
+    LD A,1
+    LD (MOVE_WARNING_ACTIVE),A
+    LD A,(HL)
+.MOVE_LIMIT:
+    CP MOVE_DISTANCE_LIMIT
+    JR C,.SHOOT_COUNT
+    LD (HL),0
+    XOR A
+    LD (MISS_TRAVEL_ROWS),A      ; prevent simultaneous/delayed double fine
+    JR .PENALTY
+
+.SHOOT_COUNT:
+    LD A,(MISS_KILLED_THIS_TICK)
+    OR A
+    RET NZ                       ; a kill restarted this independent timer
     LD HL,MISS_TRAVEL_ROWS
     INC (HL)
     LD A,(HL)
     CP MISS_SCREEN_ROWS
-    JR NZ,.CHECK_PENALTY
-    ; One complete screen has passed without destroying an asteroid.
-    ; Warning stays active across the 3-screen penalty counter wrap.
+    JR NZ,.SHOOT_LIMIT
     LD A,1
     LD (SHOOT_WARNING_ACTIVE),A
     LD A,(HL)
-.CHECK_PENALTY:
+.SHOOT_LIMIT:
     CP MISS_DISTANCE_LIMIT
-    RET C                         ; fewer than 3 screens since last kill
-    LD (HL),0                     ; begin the next 3-screen interval
+    RET C
+    LD (HL),0
+    LD A,(MOVE_WARNING_ACTIVE)
+    OR A
+    RET NZ                       ; stationary ship: only MOVE can fine
 
+.PENALTY:
     LD HL,PRESSURE_LEVEL
-    INC (HL)                      ; once red, segments never turn green
+    INC (HL)
     LD A,1
     LD (GAUGE_DIRTY),A
-    LD A,SFX_PENALTY           ; new red segment: double warning chirp
+    LD A,SFX_PENALTY             ; identical sound/penalty for both
     CALL SFX_START
     LD A,(PRESSURE_LEVEL)
     CP PRESSURE_SEGMENTS
     RET C
 
-    ; Full red bar takes one life and triggers the familiar ship blast.
+    ; Ten red segments remove a life via the normal ship explosion.
     LD A,(SHIP_LIVES)
     OR A
     RET Z
@@ -452,6 +483,17 @@ UPDATE_MISS_PRESSURE:
     LD A,1
     LD (HUD_DIRTY),A
     JP START_SHIP_EXPLOSION
+
+; Called at .MOVED, after ship position changes by 4 pixels.
+; IN: none. PRESERVES BC, DE, IX/IY (D holds banking direction).
+RESET_MOVE_TRAVEL:
+    XOR A
+    LD (MOVE_TRAVEL_ROWS),A
+    LD (MOVE_WARNING_ACTIVE),A
+    LD (SHOOT_BLINK_COUNTER),A    ; switch promptly to SHOOT if still due
+    INC A
+    LD (MOVE_CHANGED_THIS_TICK),A
+    RET
 
 ; Called ONLY for an asteroid destroyed by bullets.
 RESET_MISS_TRAVEL:

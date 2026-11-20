@@ -98,6 +98,12 @@ MISS_TRAVEL_ROWS:
     DB 0                        ; 0..59 asteroid-movement rows since last kill
 MISS_KILLED_THIS_TICK:
     DB 0                        ; don't count the movement before a kill
+MOVE_TRAVEL_ROWS:
+    DB 0                        ; world rows since last real 4px lateral move
+MOVE_WARNING_ACTIVE:
+    DB 0                        ; latch after one unmoved screen; clear on move
+MOVE_CHANGED_THIS_TICK:
+    DB 0                        ; skip same-tick move distance increment
 PRESSURE_LEVEL:
     DB 0                        ; 0..10, persistent red segments right-to-left
 BOSS_STARTED:         DB 0      ; boss phase reached this game
@@ -121,7 +127,7 @@ HOSTILE_BULLET_POOL:  DS MAX_HOSTILE_BULLETS*HOSTILE_BULLET_SIZE,0
 SHOOT_WARNING_ACTIVE:
     DB 0                        ; latch after >=20 travel rows; clear on kill/life
 SHOOT_VISIBLE:
-    DB 0                        ; screen currently contains SHOOT! text
+    DB 0                        ; 0 hidden, 1 SHOOT!, 2 MOVE!
 SHOOT_BLINK_COUNTER:
     DB 0                        ; increments only while warning/play active
 SHOOT_SAVED_BITMAP:
@@ -862,6 +868,7 @@ SPACE_HELD:        DB 0
 HUD_LABEL_TITLE:  DB "SPACECAN: SPACE SODA",0
 HUD_LABEL_SPEED:  DB "SPEED",0
 HUD_LABEL_SHOOT:  DB "SHOOT!",0
+HUD_LABEL_MOVE:   DB "MOVE! ",0    ; 6 cells, trailing space erases old !
 
 ; Each life is one 8x8 character, active vs spent.
 HEART_FILLED:

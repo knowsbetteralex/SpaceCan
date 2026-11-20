@@ -54,6 +54,7 @@ DEMO_BOSS_SCORE      EQU 4096
 START_LIVES          EQU 4
 MISS_SCREEN_ROWS      EQU PLAYFIELD_BOTTOM-PLAYFIELD_TOP+1
 MISS_DISTANCE_LIMIT   EQU MISS_SCREEN_ROWS*3 ; 3 full corridor heights without kills
+MOVE_DISTANCE_LIMIT   EQU MISS_SCREEN_ROWS*3 ; 3 full corridor heights without lateral moves
 SHOOT_TEXT_X          EQU 13    ; central HUD, below hearts and above gauge
 SHOOT_TEXT_Y          EQU 2
 SHOOT_TEXT_WIDTH      EQU 6     ; "SHOOT!"
@@ -162,6 +163,9 @@ START_NEW_GAME:
     LD (SPEED_LEVEL),A        ; demo: stage 0 (1x), then stage 2 (2x)
     LD (ENEMY_SPEED_PHASE),A
     LD (MISS_TRAVEL_ROWS),A       ; a new game resets travel since last kill
+    LD (MOVE_TRAVEL_ROWS),A       ; independent distance without movement
+    LD (MOVE_WARNING_ACTIVE),A
+    LD (MOVE_CHANGED_THIS_TICK),A
     LD (SHOOT_WARNING_ACTIVE),A
     LD (SHOOT_BLINK_COUNTER),A
     LD (PRESSURE_LEVEL),A        ; start with ten green segments
@@ -186,6 +190,9 @@ RESTART_ROUND:
     LD (PRESSURE_LEVEL),A
     LD (MISS_TRAVEL_ROWS),A
     LD (MISS_KILLED_THIS_TICK),A
+    LD (MOVE_TRAVEL_ROWS),A
+    LD (MOVE_WARNING_ACTIVE),A
+    LD (MOVE_CHANGED_THIS_TICK),A
     LD (SHOOT_WARNING_ACTIVE),A
     LD (SHOOT_BLINK_COUNTER),A
     CALL DRAW_STATIC_UI
