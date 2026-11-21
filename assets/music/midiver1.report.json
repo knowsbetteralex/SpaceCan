@@ -1,0 +1,187 @@
+{
+  "fps": 50,
+  "clock_hz": 2000000,
+  "frames": 2322,
+  "duration_seconds": 46.44,
+  "tracks": 5,
+  "note_tracks": 3,
+  "midi_channels": [
+    1,
+    2,
+    10
+  ],
+  "tempo_changes": 4,
+  "percussion": "compact",
+  "peak_polyphony": 4,
+  "average_polyphony": 2.172,
+  "overflow_frames": 3,
+  "lost_note_instances": 3,
+  "lost_note_frames": 3,
+  "losses": [
+    {
+      "frame": 129,
+      "midi_channel": 10,
+      "track": 4,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 131,
+      "midi_channel": 10,
+      "track": 4,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 136,
+      "midi_channel": 10,
+      "track": 4,
+      "note": 36,
+      "reason": "steal"
+    }
+  ],
+  "warnings": [],
+  "format": "aym2",
+  "compression": {
+    "codec_version": "aym2-v1/2026-11-21",
+    "requested_format": "aym2",
+    "format": "aym2",
+    "compression_mode": "dictionary",
+    "selection_reason": "explicit_format",
+    "lossless": true,
+    "aym1_bytes": 5656,
+    "aym1_fits": true,
+    "aym2_bytes": 2608,
+    "bytes": 2608,
+    "saved_bytes": 3048,
+    "saved_percent": 53.89,
+    "header_bytes": 24,
+    "stream_bytes": 1990,
+    "dictionary_entries": 61,
+    "dictionary_pointer_bytes": 122,
+    "dictionary_body_bytes": 472,
+    "dictionary_limit": 96,
+    "frame_commands": 917,
+    "wait_commands": 526,
+    "wait_frames": 1405,
+    "unique_frame_commands": 149,
+    "loop_frame": 0,
+    "common_frames": [
+      {
+        "command_hex": "80 00 04 00",
+        "count": 362,
+        "short_bytes": 1
+      },
+      {
+        "command_hex": "80 30 04 70 04 05",
+        "count": 75,
+        "short_bytes": 4
+      },
+      {
+        "command_hex": "80 30 04 64 09 06",
+        "count": 59,
+        "short_bytes": 4
+      },
+      {
+        "command_hex": "80 00 04 08",
+        "count": 39,
+        "short_bytes": 2
+      },
+      {
+        "command_hex": "80 c0 04 02 1c 08",
+        "count": 29,
+        "short_bytes": 4
+      },
+      {
+        "command_hex": "80 04 04 3f 08",
+        "count": 20,
+        "short_bytes": 5
+      },
+      {
+        "command_hex": "80 04 04 0c 08",
+        "count": 19,
+        "short_bytes": 5
+      },
+      {
+        "command_hex": "80 cc 04 3f 01 02 1c 08",
+        "count": 18,
+        "short_bytes": 8
+      },
+      {
+        "command_hex": "80 c4 04 3f 02 1c 08",
+        "count": 10,
+        "short_bytes": 7
+      },
+      {
+        "command_hex": "80 f0 04 71 02 05 18 0a",
+        "count": 9,
+        "short_bytes": 8
+      },
+      {
+        "command_hex": "80 30 04 71 02 0a",
+        "count": 8,
+        "short_bytes": 4
+      },
+      {
+        "command_hex": "80 00 04 04",
+        "count": 8,
+        "short_bytes": 2
+      }
+    ],
+    "register_masks": {
+      "0001": 5,
+      "0003": 5,
+      "0004": 18,
+      "000c": 17,
+      "0100": 1,
+      "020c": 1,
+      "0300": 1,
+      "0303": 1,
+      "0400": 409,
+      "0403": 9,
+      "0404": 59,
+      "0407": 6,
+      "040c": 12,
+      "040d": 1,
+      "040f": 7,
+      "0430": 144,
+      "0431": 7,
+      "0433": 1,
+      "0435": 1,
+      "0437": 5,
+      "043c": 6,
+      "0440": 3,
+      "0443": 2,
+      "0444": 1,
+      "0447": 2,
+      "044c": 1,
+      "044f": 1,
+      "0470": 4,
+      "0471": 1,
+      "0473": 1,
+      "0474": 1,
+      "0477": 1,
+      "047c": 9,
+      "047f": 1,
+      "04c0": 29,
+      "04c1": 1,
+      "04c3": 1,
+      "04c4": 19,
+      "04c7": 2,
+      "04cc": 32,
+      "04cd": 1,
+      "04f0": 16,
+      "04f3": 11,
+      "04f4": 12,
+      "04f5": 1,
+      "04f7": 5,
+      "04fc": 24,
+      "04ff": 16,
+      "067c": 1,
+      "06cf": 1,
+      "07ff": 1
+    }
+  },
+  "bytes": 2608,
+  "compression_bytes_per_frame": 1.123
+}

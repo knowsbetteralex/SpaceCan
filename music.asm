@@ -10,10 +10,10 @@
 
     IF AY_MUSIC_ENABLED
 AY_MUSIC_TITLE:
-    INCBIN "assets/music/main_menu.aym"
+    INCBIN "assets/music/main_menu1.aym"
 
 AY_MUSIC_GAME:
-    INCBIN "assets/music/midiver.aym"
+    INCBIN "assets/music/midiver1.aym"
 
 AY_MUSIC_GAME_OVER:
     INCBIN "assets/music/game_over.aym"
