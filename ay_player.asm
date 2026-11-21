@@ -1,8 +1,8 @@
 ; -------------------------------------------------------------
-; SpaceCan AYM1 v1 player: register deltas at 50Hz, no MIDI parsing.
+; SpaceCan dual AYM1 / AYM2 v1 player: AY register writes at 50Hz.
 ;
 ; AY_INIT     reset hardware/shadow
-; AY_PLAY     HL -> AYM1 blob (header + command stream)
+; AY_PLAY     HL -> AYM1 or AYM2 blob (version-dispatched)
 ; AY_TICK     IM2-only, one stream frame (preserves BC,DE,HL,IX)
 ; AY_PAUSE    mute and freeze stream; do not reset AY R13
 ; AY_RESUME   restore R7 and R8-R10 from last logical frame
@@ -51,6 +51,7 @@ AY_STOP_RAW:
     LD (AY_ACTIVE),A
     LD (AY_PAUSED),A
     LD (AY_WAIT),A
+    LD (AY_MODE),A                 ; 0=stopped, 1=AYM1, 2=AYM2
     LD (AY_BOSS_BOOM_LEFT),A
     JP AY_SILENCE
 
@@ -88,6 +89,8 @@ AY_PLAY_RAW:
     JP NZ,.INVALID
     INC HL
     LD A,(HL)
+    CP '2'
+    JP Z,AYM2_PLAY_HEADER         ; new header starts at offset +4
     CP '1'
     JP NZ,.INVALID
     INC HL
@@ -152,6 +155,7 @@ AY_PLAY_RAW:
     LD (AY_LOOP_PTR),HL
 .READY:
     LD A,1
+    LD (AY_MODE),A
     LD (AY_ACTIVE),A
     RET
 .INVALID:
@@ -233,6 +237,9 @@ AY_TICK_INTERNAL:
     RET
 
 .DECODE:
+    LD A,(AY_MODE)
+    CP 2
+    JP Z,AYM2_TICK_DECODE
     ; Guard the command pointer before reading a new opcode.
     LD HL,(AY_POS)
     LD DE,(AY_END_PTR)
@@ -379,6 +386,7 @@ AY_BOSS_BOOM_TICK:
 AY_BOSS_BOOM_LEFT: DB 0
 AY_BOSS_NOISE_SEED: DB #B5
 
+AY_MODE:         DB 0           ; AYM1 or AYM2 discriminator
 AY_ACTIVE:       DB 0
 AY_PAUSED:       DB 0
 AY_FLAGS:        DB 0

@@ -6,6 +6,9 @@
 
 ### Изменения / What's new
 
+- Декодер AY теперь читает **AYM1 и AYM2** в одной сборке: сжатые треки меню и игры используют AYM2 v1, а финалы сохраняют AYM1. / Dual AYM1/AYM2 playback, compressed main/menu music without changing the sounds.
+- Сжатые два главных трека занимают 4 475 вместо 8 600 байт (минус 47,97% данных; дополнительный код плеера учитывается отдельно). / The two compressed themes save 4,125 bytes of music data.
+
 - Добавлено `MOVE!`: после одной высоты коридора без движения предупреждение, через три — штраф. При движении, но отсутствии уничтоженных астероидов по-прежнему работает `SHOOT!` / New priority MOVE! idle movement warning and penalty after three corridor traversals; SHOOT! stays for missed kills while moving.
 - По-прежнему основной режим босса — `0:MIX` со всеми предыдущими атаками / MIX remains the default boss attack pattern.
 
