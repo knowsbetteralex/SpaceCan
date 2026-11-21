@@ -50,16 +50,17 @@ def decode(data):
             dictionary.append(frame)
         assert pointer == len(data)
     assert (start <= loop < end-1) if flags & 1 else loop == 0
-    boundaries = set()
+    boundaries = {}
     pos, frame_count, trace = start, 0, []
     while pos < end:
         at = pos
+        boundaries[at] = frame_count  # logical 50Hz loop frame, not file offset
         opcode = data[pos]
         pos += 1
         if opcode == 0:
             assert pos == end and trace, "END must close stream"
             assert not flags & 1 or loop in boundaries
-            return tuple(trace), clock, loop
+            return tuple(trace), clock, boundaries[loop] if flags & 1 else None
         if opcode == 0x80:
             writes, pos = read_frame(data, at, end)
             trace.append(writes)
@@ -84,7 +85,6 @@ def decode(data):
             frame_count += 1
         else:
             raise AssertionError(f"illegal opcode: {opcode:#x}")
-        boundaries.add(at)
     raise AssertionError("missing END")
 
 

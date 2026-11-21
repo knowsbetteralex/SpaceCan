@@ -250,7 +250,7 @@ AYM2_TICK_DECODE:
     LD A,(HL)
     INC HL
     OR A
-    JR Z,.END
+    JP Z,.END                   ; distant loop/stop handler
     CP #80
     JR Z,.FULL
     JR C,.WAIT
