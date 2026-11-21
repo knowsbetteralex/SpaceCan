@@ -272,6 +272,7 @@ MAIN_LOOP:
     INCLUDE "melodies.asm"
     INCLUDE "ay_driver.asm"
     INCLUDE "ay_player.asm"
+    INCLUDE "aym2_player.asm"
     INCLUDE "music.asm"
     INCLUDE "logic.asm"
     INCLUDE "bullets.asm"

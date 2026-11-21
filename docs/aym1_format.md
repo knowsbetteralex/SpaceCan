@@ -1,6 +1,8 @@
 # AYM1 v1 — формат музыки SpaceCan для AY-3-8910/8913
 
-**Статус:** спецификация v1, проигрыватель `ay_player.asm` (Step 16).
+**Статус:** спецификация v1; SpaceCan поддерживает **AYM1 и AYM2 v1** в одном плеере. Две главные темы уже сжаты AYM2, а концовки по-прежнему AYM1.
+
+**План будущего сжатия:** [анализ активных треков и требования к AYM2](aym_compression_analysis.md) и [ТЗ в MIDI2AYM1](https://github.com/knowsbetteralex/MIDI2AYM1/blob/main/docs/aym2_compression_spec.md). Все опкоды `81..FF` запрещены именно в AYM1; AYM2 v1 использует отдельную сигнатуру и [свою нормативную карту команд](https://github.com/knowsbetteralex/MIDI2AYM1/blob/main/docs/aym2_format.md).
 **Назначение:** конвертер на ПК формирует готовый поток записей в AY; Z80
 только декодирует кадры. Самостоятельные MIDI-ноты в этом формате **не хранятся**.
 

@@ -1,0 +1,700 @@
+{
+  "fps": 50,
+  "clock_hz": 2000000,
+  "frames": 2085,
+  "duration_seconds": 41.7,
+  "tracks": 5,
+  "note_tracks": 3,
+  "midi_channels": [
+    1,
+    3,
+    10
+  ],
+  "tempo_changes": 1,
+  "percussion": "compact",
+  "peak_polyphony": 5,
+  "average_polyphony": 1.989,
+  "overflow_frames": 125,
+  "lost_note_instances": 71,
+  "lost_note_frames": 126,
+  "losses": [
+    {
+      "frame": 696,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 28,
+      "reason": "steal"
+    },
+    {
+      "frame": 707,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 28,
+      "reason": "steal"
+    },
+    {
+      "frame": 718,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 28,
+      "reason": "steal"
+    },
+    {
+      "frame": 739,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 28,
+      "reason": "steal"
+    },
+    {
+      "frame": 793,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 38,
+      "reason": "steal"
+    },
+    {
+      "frame": 804,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 38,
+      "reason": "steal"
+    },
+    {
+      "frame": 825,
+      "midi_channel": 10,
+      "track": 5,
+      "note": 42,
+      "reason": "steal"
+    },
+    {
+      "frame": 825,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 38,
+      "reason": "steal"
+    },
+    {
+      "frame": 836,
+      "midi_channel": 10,
+      "track": 5,
+      "note": 42,
+      "reason": "steal"
+    },
+    {
+      "frame": 868,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 879,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 889,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 911,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 954,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 964,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 975,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 986,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 38,
+      "reason": "steal"
+    },
+    {
+      "frame": 996,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 38,
+      "reason": "steal"
+    },
+    {
+      "frame": 1007,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 38,
+      "reason": "steal"
+    },
+    {
+      "frame": 1039,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 28,
+      "reason": "steal"
+    },
+    {
+      "frame": 1050,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 28,
+      "reason": "steal"
+    },
+    {
+      "frame": 1061,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 28,
+      "reason": "steal"
+    },
+    {
+      "frame": 1082,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 28,
+      "reason": "steal"
+    },
+    {
+      "frame": 1104,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 28,
+      "reason": "steal"
+    },
+    {
+      "frame": 1125,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 31,
+      "reason": "steal"
+    },
+    {
+      "frame": 1136,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 31,
+      "reason": "steal"
+    },
+    {
+      "frame": 1146,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 31,
+      "reason": "steal"
+    },
+    {
+      "frame": 1168,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 31,
+      "reason": "steal"
+    },
+    {
+      "frame": 1189,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 31,
+      "reason": "steal"
+    },
+    {
+      "frame": 1211,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 31,
+      "reason": "steal"
+    },
+    {
+      "frame": 1221,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 31,
+      "reason": "steal"
+    },
+    {
+      "frame": 1232,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 31,
+      "reason": "steal"
+    },
+    {
+      "frame": 1254,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 31,
+      "reason": "steal"
+    },
+    {
+      "frame": 1275,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 31,
+      "reason": "steal"
+    },
+    {
+      "frame": 1296,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 31,
+      "reason": "steal"
+    },
+    {
+      "frame": 1307,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 31,
+      "reason": "steal"
+    },
+    {
+      "frame": 1318,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 31,
+      "reason": "steal"
+    },
+    {
+      "frame": 1339,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 30,
+      "reason": "steal"
+    },
+    {
+      "frame": 1350,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 30,
+      "reason": "steal"
+    },
+    {
+      "frame": 1361,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 30,
+      "reason": "steal"
+    },
+    {
+      "frame": 1382,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 28,
+      "reason": "steal"
+    },
+    {
+      "frame": 1393,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 28,
+      "reason": "steal"
+    },
+    {
+      "frame": 1404,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 28,
+      "reason": "steal"
+    },
+    {
+      "frame": 1468,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 35,
+      "reason": "steal"
+    },
+    {
+      "frame": 1479,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 35,
+      "reason": "steal"
+    },
+    {
+      "frame": 1489,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 35,
+      "reason": "steal"
+    },
+    {
+      "frame": 1543,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 1554,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 1564,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 1725,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 33,
+      "reason": "steal"
+    },
+    {
+      "frame": 1736,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 33,
+      "reason": "steal"
+    },
+    {
+      "frame": 1746,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 33,
+      "reason": "steal"
+    },
+    {
+      "frame": 1757,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 33,
+      "reason": "steal"
+    },
+    {
+      "frame": 1768,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 33,
+      "reason": "steal"
+    },
+    {
+      "frame": 1779,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 33,
+      "reason": "steal"
+    },
+    {
+      "frame": 1789,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 33,
+      "reason": "steal"
+    },
+    {
+      "frame": 1800,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 33,
+      "reason": "steal"
+    },
+    {
+      "frame": 1811,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 33,
+      "reason": "steal"
+    },
+    {
+      "frame": 1821,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 33,
+      "reason": "steal"
+    },
+    {
+      "frame": 1832,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 33,
+      "reason": "steal"
+    },
+    {
+      "frame": 1843,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 33,
+      "reason": "steal"
+    },
+    {
+      "frame": 1854,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 33,
+      "reason": "steal"
+    },
+    {
+      "frame": 1864,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 35,
+      "reason": "steal"
+    },
+    {
+      "frame": 1875,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 35,
+      "reason": "steal"
+    },
+    {
+      "frame": 1886,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 1896,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 1907,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 1918,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 1929,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 1950,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 36,
+      "reason": "steal"
+    },
+    {
+      "frame": 1971,
+      "midi_channel": 3,
+      "track": 3,
+      "note": 38,
+      "reason": "steal"
+    }
+  ],
+  "warnings": [],
+  "format": "aym2",
+  "compression": {
+    "codec_version": "aym2-v1/2026-11-21",
+    "requested_format": "aym2",
+    "format": "aym2",
+    "compression_mode": "dictionary",
+    "selection_reason": "explicit_format",
+    "lossless": true,
+    "aym1_bytes": 2944,
+    "aym1_fits": true,
+    "aym2_bytes": 1867,
+    "bytes": 1867,
+    "saved_bytes": 1077,
+    "saved_percent": 36.58,
+    "header_bytes": 24,
+    "stream_bytes": 1618,
+    "dictionary_entries": 26,
+    "dictionary_pointer_bytes": 52,
+    "dictionary_body_bytes": 173,
+    "dictionary_limit": 96,
+    "frame_commands": 431,
+    "wait_commands": 292,
+    "wait_frames": 1654,
+    "unique_frame_commands": 156,
+    "loop_frame": 0,
+    "common_frames": [
+      {
+        "command_hex": "80 00 04 00",
+        "count": 65,
+        "short_bytes": 1
+      },
+      {
+        "command_hex": "80 30 04 64 09 06",
+        "count": 46,
+        "short_bytes": 4
+      },
+      {
+        "command_hex": "80 00 01 00",
+        "count": 36,
+        "short_bytes": 1
+      },
+      {
+        "command_hex": "80 80 00 38",
+        "count": 28,
+        "short_bytes": 2
+      },
+      {
+        "command_hex": "80 30 04 70 04 05",
+        "count": 23,
+        "short_bytes": 4
+      },
+      {
+        "command_hex": "80 00 03 00 00",
+        "count": 19,
+        "short_bytes": 5
+      },
+      {
+        "command_hex": "80 b0 04 77 07 38 08",
+        "count": 8,
+        "short_bytes": 7
+      },
+      {
+        "command_hex": "80 30 04 c2 03 0b",
+        "count": 7,
+        "short_bytes": 4
+      },
+      {
+        "command_hex": "80 80 03 1c 08 08",
+        "count": 6,
+        "short_bytes": 6
+      },
+      {
+        "command_hex": "80 b0 04 e1 08 38 08",
+        "count": 6,
+        "short_bytes": 7
+      },
+      {
+        "command_hex": "80 b0 00 da 0b 38",
+        "count": 5,
+        "short_bytes": 6
+      },
+      {
+        "command_hex": "80 f0 04 71 02 05 18 0a",
+        "count": 5,
+        "short_bytes": 8
+      }
+    ],
+    "register_masks": {
+      "0001": 18,
+      "0003": 4,
+      "0004": 1,
+      "0080": 28,
+      "008c": 1,
+      "0090": 3,
+      "00b0": 13,
+      "00c1": 2,
+      "00c4": 1,
+      "00c5": 3,
+      "0100": 36,
+      "0103": 1,
+      "0180": 2,
+      "0183": 1,
+      "0184": 8,
+      "0185": 1,
+      "018f": 2,
+      "01c3": 1,
+      "01c4": 1,
+      "0200": 1,
+      "0201": 1,
+      "028d": 1,
+      "0300": 19,
+      "0380": 6,
+      "0385": 1,
+      "0387": 1,
+      "038c": 1,
+      "038d": 2,
+      "03c3": 1,
+      "0400": 68,
+      "0401": 3,
+      "0403": 1,
+      "040f": 1,
+      "0430": 76,
+      "0431": 1,
+      "0433": 2,
+      "044c": 2,
+      "0470": 4,
+      "0471": 1,
+      "0473": 2,
+      "047d": 2,
+      "047f": 2,
+      "0490": 2,
+      "04b0": 24,
+      "04b3": 1,
+      "04b5": 1,
+      "04bd": 1,
+      "04c1": 2,
+      "04c3": 2,
+      "04cd": 2,
+      "04cf": 4,
+      "04f0": 5,
+      "04f1": 5,
+      "04f3": 2,
+      "04f4": 2,
+      "04f5": 5,
+      "04fd": 3,
+      "04ff": 1,
+      "0504": 2,
+      "05b7": 1,
+      "05c1": 1,
+      "05c4": 1,
+      "05cc": 1,
+      "05f1": 1,
+      "05f3": 3,
+      "05f4": 2,
+      "05f5": 1,
+      "05fc": 1,
+      "05fd": 2,
+      "0603": 2,
+      "0630": 1,
+      "063c": 1,
+      "063d": 1,
+      "064f": 1,
+      "0684": 1,
+      "06bf": 1,
+      "06c3": 3,
+      "06c7": 1,
+      "06cd": 1,
+      "06cf": 2,
+      "06f3": 2,
+      "070d": 1,
+      "07bf": 2,
+      "07c0": 1,
+      "07f0": 1,
+      "07f1": 2,
+      "07f3": 2,
+      "07ff": 1
+    }
+  },
+  "bytes": 1867,
+  "compression_bytes_per_frame": 0.895
+}

@@ -65,6 +65,7 @@ python3 make_tap.py SpaceCan.bin SpaceCan.tap
 
 - [CHANGELOG.md — история изменений / development history](CHANGELOG.md)
 - [docs/ — техническая документация / technical documentation](docs/)
+- [Анализ сжатия AY-музыки / AY music compression analysis](docs/aym_compression_analysis.md) — предварительное ТЗ AYM2 и замеры на текущих треках
 - [GitHub Releases — TAP builds / сборки игры](https://github.com/knowsbetteralex/SpaceCan/releases)
 
 *The screenshot above is a static artwork/HUD preview, not a gameplay capture. / Изображение выше — статический макет заставки и панели, а не скриншот игрового процесса.*

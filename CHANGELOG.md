@@ -1,5 +1,13 @@
 # SpaceCan — Changelog / История изменений
 
+## 2026-11-21 — Dual-format AY player (AYM1 + AYM2)
+
+- Added version dispatch in `ay_player.asm` and AYM2 v1 decoder in `aym2_player.asm`: full FRAME, WAIT, END, short R0..R13/volume/mixer operations, non-recursive dictionary tokens and same-frame loop.
+- Game music `midiver1.aym` and menu `main_menu1.aym` are compressed AYM2; victory/defeat cues remain AYM1. Binary files are not edited or reconverted.
+- 8,600 bytes of the two original active themes become 4,475 bytes of AYM2 data (47.97% smaller); newly added decoder code offsets part of the RAM saving.
+- Preserved IM2 AY tick, silent pause/resume, register shadow, R13 write semantics, beeper sound effects, boss boom, and optional AY-disabled build.
+
+
 ## 2026-11-20 — MOVE! и SHOOT! / Prioritized movement warning
 
 - Добавлено приоритетное мигающее `MOVE!` после одного пролёта без фактического движения корабля влево или вправо. Три пролёта без движения дают одно красное деление штрафа.
