@@ -53,7 +53,7 @@ SHOW_START_MENU:
     LD (MENU_TEXT_ATTR),A
     LD BC,#1209                    ; ZX 1..6 / 0 = MIX
     LD DE,MENU_ATTACK_HINT
-    CALL MENU_PRINT_TEXT
+    ;CALL MENU_PRINT_TEXT
 
     LD A,0
     LD (MENU_PROMPT_MODE),A        ; TO START
