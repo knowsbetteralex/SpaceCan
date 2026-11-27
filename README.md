@@ -10,7 +10,7 @@
 
 **SpaceCan** — космическая аркада для **ZX Spectrum 48K** и совместимых машин. Управляйте маленьким кораблём в узком коридоре, уворачивайтесь от астероидов и уничтожайте их выстрелами. На фоне движется звёздное поле, а по мере набора очков растёт скорость. В конце текущего демо вас ждёт большой корабль-босс с двумя пушками.
 
-**Основные возможности:** анимированные астероиды двух размеров, четыре жизни, до шести одновременно выпущенных пуль, счёт и индикатор опасности, предупреждение `SHOOT!` при долгом отсутствии уничтожений, пауза и звуковые эффекты. Звук включает биперные эффекты, настраиваемое жужжание двигателя и, при наличии, **AY**-музыку.
+**Основные возможности:** анимированные астероиды двух размеров, четыре жизни, до шести пуль игрока, счёт и десятисегментная шкала опасности, приоритетные предупреждения `MOVE!` и `SHOOT!`, пауза. Финальный босс использует фиксированный **MIX**: прицельные, веерные, плазменные, двойные и самонаводящиеся выстрелы. В центре HUD во время боя — **AVOID** и пурпурная пиктограмма несбиваемой плазмы. Музыка и эффекты есть в версиях с AY и без AY.
 
 **Управление**
 
@@ -22,17 +22,17 @@
 | **ENTER** | Пауза / продолжить |
 | **Любая клавиша** | Начать игру из меню |
 
-Если слишком долго не уничтожать астероиды, растёт десятисегментный индикатор штрафа. Во время финального боя этот же индикатор показывает здоровье босса. Потеря жизни сбрасывает астероиды к верхней границе, оставляя время на уклонение.
+Если долго не двигаться, появится `MOVE!` (предупреждение приоритетнее `SHOOT!`); за три пролёта без движения начисляется штраф. Если движение есть, но астероиды не уничтожаются, действует `SHOOT!`. Общая шкала заполняется за нарушения, после десяти делений снимается жизнь. Во время финального боя этот же индикатор показывает здоровье босса. Потеря жизни сбрасывает астероиды к верхней границе, оставляя время на уклонение.
 
-**Скачать игру:** [последний TAP](https://github.com/knowsbetteralex/SpaceCan/releases/latest) · [все релизы](https://github.com/knowsbetteralex/SpaceCan/releases).
+**Предфинальная демоверсия:** [с AY (SpaceCan-AY.tap)](https://github.com/knowsbetteralex/SpaceCan/releases/latest/download/SpaceCan-AY.tap) · [без AY (SpaceCan-Beeper.tap)](https://github.com/knowsbetteralex/SpaceCan/releases/latest/download/SpaceCan-Beeper.tap) · [все релизы](https://github.com/knowsbetteralex/SpaceCan/releases).
 
-TAP содержит BASIC-загрузчик: в обычном режиме ZX Spectrum выполните `LOAD ""`, и игра запустится автоматически. Для запуска необходима 48-килобайтная модель ZX Spectrum или совместимый эмулятор; AY необязателен для сборки без AY.
+Оба TAP содержат BASIC-загрузчик: выполните `LOAD ""`. Версия с AY использует четыре независимых **AYM2 v1**-трека: меню, полёт, победа, поражение. При входе в меню и после победы/поражения сначала звучит отдельная биперная мелодия, **затем AY**. Три биперные мелодии различаются; короткий звук паузы — отдельный эффект. Финальные AY-треки пока временные, окончательные будут добавлены перед финальным релизом. На доработанной Delta-C проверена игра с нормальным кадровым INT.
 
 ## English
 
 **SpaceCan** is a space shooter for the **ZX Spectrum 48K** and compatible machines. Pilot a small ship through a narrow corridor, dodge incoming asteroids, and shoot them down. A moving starfield creates the sensation of flight, and the game speeds up as your score increases. The current demo finishes with a large twin-cannon boss ship.
 
-**Features:** animated asteroids in two sizes, four lives, up to six player bullets, scoring and a danger meter, a blinking `SHOOT!` warning when you stop destroying asteroids, pause support, and sound effects. Sound includes beeper effects, a configurable engine buzz, and optional **AY** music.
+**Features:** animated asteroids, four lives, up to six player bullets, a ten-segment danger gauge, prioritized `MOVE!` / `SHOOT!` warnings, pause, and a final boss with fixed **MIX** (aimed, fan, invulnerable plasma, double, and homing attacks). The six-cell boss HUD says **AVOID** followed by the actual magenta plasma sprite. Two builds are available, with or without AY.
 
 **Controls**
 
@@ -44,11 +44,11 @@ TAP содержит BASIC-загрузчик: в обычном режиме ZX
 | **ENTER** | Pause / resume |
 | **Any key** | Start from the title screen |
 
-Missing too many asteroids fills the ten-segment penalty gauge. During the final boss encounter, the same gauge displays the boss's remaining health. When you lose a life, asteroids restart from the top, giving you time to react.
+Not moving triggers `MOVE!` and a penalty after three screen traversals; while moving, missed asteroid kills trigger `SHOOT!` and its own penalty. Both use the same ten-segment gauge. During the final boss encounter, the same gauge displays the boss's remaining health. When you lose a life, asteroids restart from the top, giving you time to react.
 
-**Download:** [latest TAP](https://github.com/knowsbetteralex/SpaceCan/releases/latest) · [all releases](https://github.com/knowsbetteralex/SpaceCan/releases).
+**Pre-final downloads:** [AY version](https://github.com/knowsbetteralex/SpaceCan/releases/latest/download/SpaceCan-AY.tap) · [beeper-only version](https://github.com/knowsbetteralex/SpaceCan/releases/latest/download/SpaceCan-Beeper.tap) · [all releases](https://github.com/knowsbetteralex/SpaceCan/releases).
 
-The TAP includes a BASIC loader: type `LOAD ""` on a ZX Spectrum to load and start the game automatically. Requires a ZX Spectrum 48K or compatible emulator. AY sound is optional when compiled without AY support.
+Both TAPs autostart with `LOAD ""` on a ZX Spectrum 48K. The AY build embeds four AYM2 v1 tunes (menu, game, victory, defeat); three **different** beeper scene jingles precede the AY music on the menu and ending screens. Victory/defeat AY tunes are currently placeholders awaiting final compositions.
 
 ## Development / Разработка
 
@@ -61,7 +61,7 @@ sjasmplus --nologo --raw=SpaceCan.bin main.asm
 python3 make_tap.py SpaceCan.bin SpaceCan.tap
 ```
 
-Изменяемые параметры игрового процесса и звука находятся в верхней части `main.asm`, в том числе `DEMO_SPEEDUP_SCORE`, `DEMO_BOSS_SCORE`, `AY_MUSIC_ENABLED` и `BEEPER_ENGINE_ENABLED`. Оба звуковых переключателя сейчас включены; собирается один общий TAP.
+Изменяемые параметры игрового процесса и звука находятся в верхней части `main.asm`, в том числе `DEMO_SPEEDUP_SCORE`, `DEMO_BOSS_SCORE`, `AY_MUSIC_ENABLED` и `BEEPER_ENGINE_ENABLED`. AY-флаг автоматически выставляется в 1 или 0 при выпуске двух TAP; `BEEPER_ENGINE_ENABLED` по умолчанию остаётся **0**. Для локальной сборки обоих вариантов используйте `python3 build_variants.py dist` (нужен sjasmplus в PATH).
 
 - [CHANGELOG.md — история изменений / development history](CHANGELOG.md)
 - [docs/ — техническая документация / technical documentation](docs/)
