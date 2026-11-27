@@ -64,7 +64,8 @@ class PriorityWarningTests(unittest.TestCase):
         self.assertIn("MOVE_TRAVEL_ROWS:", data)
         self.assertIn("MOVE_WARNING_ACTIVE:", data)
         self.assertIn("MOVE_CHANGED_THIS_TICK:", data)
-        self.assertIn("BOSS_DEFAULT_ATTACK_MODE EQU 0", main)
+        self.assertNotIn("BOSS_DEFAULT_ATTACK_MODE", main)
+        self.assertIn("Fixed demo boss MIX", main)
 
     def test_warning_select_and_restore_same_window(self):
         ui = src("ui.asm")
