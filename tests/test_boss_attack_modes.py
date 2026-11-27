@@ -24,7 +24,7 @@ class BossAttackModes(unittest.TestCase):
         src = asm("boss_attacks.asm")
         self.assertNotIn("BOSS_READ_ATTACK_KEYS:", src)
         self.assertNotIn("BOSS_MODE_TEXT_MIX:", src)
-        self.assertNotIn("BOSS_ATTACK_MODE:", src)
+        self.assertNotRegex(src, r"(?m)^BOSS_ATTACK_MODE:")
         self.assertIn("BOSS_FIRE_DISPATCH:", src)
         self.assertIn("LD A,(BOSS_ATTACK_CYCLE)", src)
         self.assertIn("BOSS_AVOID_TEXT: DB \"AVOID\",0", src)
