@@ -267,10 +267,12 @@ MAIN_LOOP:
     INCLUDE "menu.asm"
     INCLUDE "sfx.asm"
     INCLUDE "melodies.asm"
-    INCLUDE "ay_driver.asm"
-    INCLUDE "ay_player.asm"
-    INCLUDE "aym2_player.asm"
-    INCLUDE "music.asm"
+    IF AY_MUSIC_ENABLED
+        INCLUDE "ay_driver.asm"
+        INCLUDE "ay_player.asm"
+        INCLUDE "aym2_player.asm"
+        INCLUDE "music.asm"
+    ENDIF
     INCLUDE "logic.asm"
     INCLUDE "bullets.asm"
     INCLUDE "hostile_bullets.asm"
