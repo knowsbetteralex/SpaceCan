@@ -1,4 +1,4 @@
-; SpaceCan Step 22: short demo progression (2x at 4096; boss at 8192).
+; SpaceCan demo: 2x at 2048 points; mixed-pattern boss at 4096.
 ; ZX Spectrum 48K / Delta-C, sjasmplus syntax.
 ;
 ; Object coordinates use 8x8 cells; ship also stores a 4-pixel half-cell offset.
@@ -9,7 +9,7 @@
 
 ; -------------------------------------------------------------
 ; AUDIO SWITCHES: independent compile-time flags (0=OFF, 1=ON).
-; Both enabled in the experimental demo, one common TAP build.
+; Two release variants: AY enabled / disabled, same beeper melodies.
 ; Beeper shots/explosions always work, regardless of both flags.
 ; -------------------------------------------------------------
 AY_MUSIC_ENABLED      EQU 1    ; AY soundtrack in IM2 (needs AY board)
@@ -41,7 +41,7 @@ SPEED_STAGE_COUNT    EQU 5     ; engine supports 1 / 1.5 / 2 / 2.5 / 3
 
 ; =============================================================
 ; DEMO PROGRESSION: EDIT THE TWO SCORE LIMITS HERE.
-; 0..4095 = speed 1x; from 4096 = speed 2x; from 8192 = boss.
+; 0..2047 = speed 1x; from 2048 = speed 2x; from 4096 = boss.
 ; SCORE is 24-bit, so both limits can be set as high as 999999.
 ; The demo skips intermediate 1.5x / 2.5x / 3x stages.
 ; =============================================================
@@ -60,7 +60,8 @@ SHOOT_TEXT_Y          EQU 2
 SHOOT_TEXT_WIDTH      EQU 6     ; "SHOOT!"
 SHOOT_BLINK_MASK      EQU #10   ; 16 video frames on, 16 off
 PRESSURE_SEGMENTS     EQU 10    ; 10 penalties fill the gauge and cost a life
-GAME_OVER_FRAMES     EQU 150  ; allow 3 seconds for AY ending    ; ~1 second after the Game Over melody
+END_SCREEN_MIN_FRAMES EQU 150  ; at least 3s after beeper phrase
+END_SCREEN_MAX_FRAMES EQU 3000 ; cap at 60s if a future tune loops
 SHIP_MOVE_DELAY      EQU 2
 SHIP_BANK_DELAY      EQU 5    ; ticks between 8x8 banking poses
 SHIP_BANK_HOLD       EQU 14   ; keep tilt after releasing O/P
@@ -77,9 +78,7 @@ BOSS_FIRE_DELAY      EQU 45
 BOSS_PLAYER_SHOT_DELAY EQU 18 ; minimum gap in gameplay frames
 MAX_HOSTILE_BULLETS  EQU 12
 HOSTILE_BULLET_SIZE  EQU 10   ; target, kind and homing counter
-; Testable boss patterns: 0=mix, 1=aim, 2=fan, 3=plasma,
-; 4=double, 5=homing, 6=adaptive (aim/plasma for idle ship).
-BOSS_DEFAULT_ATTACK_MODE EQU 0
+; Fixed demo boss MIX: aimed, fan, plasma, delayed double, homing.
 BOSS_STILL_LIMIT     EQU 100   ; two seconds at 50 Hz
 BOSS_PLASMA_WARMUP   EQU 12    ; visible warning before plasma
 BOSS_DOUBLE_DELAY    EQU 10    ; delayed follow-up
@@ -171,8 +170,6 @@ START_NEW_GAME:
     LD (PRESSURE_LEVEL),A        ; start with ten green segments
     LD (BOSS_STARTED),A
     LD (BOSS_ACTIVE),A
-    LD A,BOSS_DEFAULT_ATTACK_MODE
-    LD (BOSS_ATTACK_MODE),A
     LD A,1
     LD (SCROLL_SPEED),A
     LD A,START_LIVES

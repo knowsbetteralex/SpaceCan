@@ -20,18 +20,21 @@ def equ(path, name):
 
 
 class BossAttackModes(unittest.TestCase):
-    def test_all_seven_live_selectors_and_hud_labels(self):
+    def test_fixed_mix_and_six_cell_avoid_plasma_hud(self):
         src = asm("boss_attacks.asm")
-        self.assertIn("LD BC,#F7FE", src)
-        self.assertIn("LD BC,#EFFE", src)
-        self.assertIn("BOSS_READ_ATTACK_KEYS:", src)
-        self.assertIn("RENDER_BOSS_ATTACK_MODE:", src)
+        self.assertNotIn("BOSS_READ_ATTACK_KEYS:", src)
+        self.assertNotIn("BOSS_MODE_TEXT_MIX:", src)
+        self.assertNotIn("BOSS_ATTACK_MODE:", src)
+        self.assertIn("BOSS_FIRE_DISPATCH:", src)
+        self.assertIn("LD A,(BOSS_ATTACK_CYCLE)", src)
+        self.assertIn("BOSS_AVOID_TEXT: DB \"AVOID\",0", src)
         self.assertIn("LD BC,#020D", src)
-        for mode, label in enumerate(("MIX ", "AIM ", "FAN ", "PLAS", "DUAL", "HOME", "ADPT")):
-            self.assertIn(f'DB "{mode}:{label}",0', src)
-        self.assertIn("JP BOSS_READ_ATTACK_KEYS", asm("logic.asm"))
+        self.assertIn("LD BC,#0212", src)
+        self.assertIn("LD DE,HOSTILE_PLASMA_SPRITE", src)
+        self.assertIn("LD A,(HOSTILE_PLASMA_ATTR)", src)
+        self.assertIn("JP READ_FIRE_KEY", asm("logic.asm"))
         self.assertIn("JP RENDER_BOSS_ATTACK_MODE", asm("ui.asm"))
-        self.assertIn("BOSS_DEFAULT_ATTACK_MODE EQU 0", asm("main.asm"))
+        self.assertNotIn("BOSS_DEFAULT_ATTACK_MODE", asm("main.asm"))
 
     def test_projectile_pool_and_kinds(self):
         main, shots = asm("main.asm"), asm("hostile_bullets.asm")
@@ -85,12 +88,14 @@ class BossAttackModes(unittest.TestCase):
             self.assertEqual(targets, tuple(sorted(targets)))
             self.assertEqual(targets[1], player_x)
 
-    def test_mode_switch_cancels_only_pending_attacks(self):
-        attacks = asm("boss_attacks.asm")
-        selection = attacks.split(".SELECT:", 1)[1].split(".RELEASE:", 1)[0]
-        self.assertIn("LD (BOSS_DOUBLE_WAIT),A", selection)
-        self.assertIn("LD (BOSS_PLASMA_CHARGE),A", selection)
-        self.assertNotIn("RESET_HOSTILE_BULLETS", selection)
+    def test_mix_keeps_queued_and_plasma_attacks(self):
+        src = asm("boss_attacks.asm")
+        self.assertIn("CALL BOSS_TICK_DOUBLE", src)
+        self.assertIn("JP BOSS_TICK_PLASMA", src)
+        self.assertIn("LD (BOSS_ATTACK_CYCLE),A", src)
+        self.assertIn("LD (BOSS_SELECTED_ATTACK),A", src)
+        self.assertIn("JP BOSS_FIRE_CHOSEN", src)
+        self.assertIn("LD A,2                    ; anti-camping plasma", src)
 
 
 if __name__ == "__main__":

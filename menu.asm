@@ -49,12 +49,6 @@ SHOW_START_MENU:
     LD BC,#110B                    ; ASTEROIDS!
     LD DE,MENU_PROMPT_AST
     CALL MENU_PRINT_TEXT
-    LD A,#45
-    LD (MENU_TEXT_ATTR),A
-    LD BC,#1209                    ; ZX 1..6 / 0 = MIX
-    LD DE,MENU_ATTACK_HINT
-    ;CALL MENU_PRINT_TEXT
-
     LD A,0
     LD (MENU_PROMPT_MODE),A        ; TO START
     CALL MENU_INIT_PROMPT
@@ -76,6 +70,9 @@ SHOW_VICTORY:
     LD A,STATE_VICTORY
     LD (GAME_STATE),A
     CALL SFX_STOP
+    IF AY_MUSIC_ENABLED
+        CALL AY_STOP               ; previous in-game tune must stop BEFORE beeper
+    ENDIF
     CALL DRAW_STATIC_UI
     LD A,1
     LD (HUD_DIRTY),A
@@ -88,6 +85,13 @@ SHOW_VICTORY:
     LD BC,#0D0C
     LD DE,MENU_YOU_WIN
     CALL MENU_PRINT_TEXT
+    LD A,#47                       ; show the achieved score on victory too
+    LD (MENU_TEXT_ATTR),A
+    LD BC,#0F0A
+    LD DE,MENU_FINAL_SCORE
+    CALL MENU_PRINT_TEXT
+    LD BC,#110D
+    CALL PRINT_DEC6
     ; The beeper victory melody plays first, then the AY fanfare.
     LD HL,MELODY_VICTORY
     CALL MELODY_PLAY
@@ -96,10 +100,7 @@ SHOW_VICTORY:
         CALL AY_PLAY
     ENDIF
     EI
-    LD B,150
-.HOLD:
-    HALT
-    DJNZ .HOLD
+    CALL HOLD_END_SCREEN
     JP SHOW_START_MENU
 
 MENU_BOSS_DEFEATED: DB "BOSS DEFEATED",0
@@ -110,6 +111,9 @@ SHOW_GAME_OVER:
     LD (GAME_STATE),A
     DI
     CALL SFX_STOP
+    IF AY_MUSIC_ENABLED
+        CALL AY_STOP               ; prevent in-game AY under beeper phrase
+    ENDIF
     CALL DRAW_STATIC_UI
     LD A,1
     LD (HUD_DIRTY),A
@@ -141,11 +145,34 @@ SHOW_GAME_OVER:
         CALL AY_PLAY
     ENDIF
     EI
-    LD B,GAME_OVER_FRAMES
-.HOLD:
-    HALT
-    DJNZ .HOLD
+    CALL HOLD_END_SCREEN
     JP SHOW_START_MENU            ; NOT a direct game restart
+
+; Both endings stay visible for >=3s. If AY is enabled, continue
+; showing the score until the non-looped melody finishes. A 60s
+; bound prevents accidental infinite waiting on a future looped
+; music resource. This timer starts AFTER the beeper jingle.
+HOLD_END_SCREEN:
+    LD HL,END_SCREEN_MIN_FRAMES
+.MINIMUM:
+    HALT
+    DEC HL
+    LD A,H
+    OR L
+    JR NZ,.MINIMUM
+    IF AY_MUSIC_ENABLED
+        LD HL,END_SCREEN_MAX_FRAMES-END_SCREEN_MIN_FRAMES
+.WAIT_AY:
+        LD A,(AY_ACTIVE)
+        OR A
+        RET Z
+        HALT
+        DEC HL
+        LD A,H
+        OR L
+        JR NZ,.WAIT_AY
+    ENDIF
+    RET
 
 ; Keep score/speed/lives untouched. Reset only transient game state.
 RESET_ROUND_OBJECTS:
@@ -464,7 +491,6 @@ MENU_FINAL_SCORE:  DB "FINAL  SCORE",0
 MENU_BACK_TO_TITLE: DB "BACK TO MENU",0
 MENU_PROMPT_DONT: DB "DON'T MISS",0
 MENU_PROMPT_AST: DB "ASTEROIDS!",0
-MENU_ATTACK_HINT: DB "BOSS: 0-6 MODES",0
 MENU_PROMPT_PRESS: DB "PRESS ANY KEY!",0
 MENU_PROMPT_START: DB "TO START",0
 MENU_PROMPT_RETRY: DB "TO TRY AGAIN",0

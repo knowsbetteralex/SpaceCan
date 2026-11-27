@@ -71,35 +71,26 @@ class BossFinaleTests(unittest.TestCase):
         self.assertIn('INCBIN "assets/music/midiver1.aym"', music)
         self.assertIn('INCBIN "assets/music/main_menu1.aym"', music)
         self.assertIn('INCLUDE "aym2_player.asm"', src("main.asm"))
-        self.assertIn('INCBIN "assets/music/victory.aym"', music)
+        self.assertIn('INCBIN "assets/music/victory1.aym"', music)
+        self.assertIn('INCBIN "assets/music/game_over1.aym"', music)
         self.assertIn("CALL AY_BOSS_BOOM_TICK", src("im2.asm"))
         self.assertIn("SFX_BOSS    EQU 6", src("sfx.asm"))
 
-    def test_victory_aym1_header_and_commands(self):
-        data = (ROOT / "assets/music/victory.aym").read_bytes()
-        self.assertEqual(data[:4], b"AYM1")
-        self.assertEqual(data[4], 50)
-        self.assertEqual(data[5], 0)  # no loop
-        self.assertEqual(struct.unpack_from("<H", data, 6)[0], len(data))
-        self.assertEqual(struct.unpack_from("<H", data, 8)[0], 0)
-        self.assertEqual(struct.unpack_from("<H", data, 10)[0], 0)
-        self.assertEqual(struct.unpack_from("<I", data, 12)[0], 2000000)
-        pos, frames = 16, 0
-        while pos < len(data):
-            code = data[pos]
-            pos += 1
-            if code == 0:
-                break
-            if code == 0x80:
-                mask = struct.unpack_from("<H", data, pos)[0]
-                self.assertEqual(mask & ~0x3FFF, 0)
-                pos += 2 + mask.bit_count()
-                frames += 1
-            else:
-                self.assertLessEqual(code, 127)
-                self.assertGreater(code, 0)
-        self.assertEqual(pos, len(data))
-        self.assertGreaterEqual(frames, 5)
+    def test_both_endings_are_nonlooped_aym2(self):
+        for name in ("victory1.aym", "game_over1.aym"):
+            with self.subTest(name=name):
+                data = (ROOT / "assets/music" / name).read_bytes()
+                self.assertEqual(data[:4], b"AYM2")
+                self.assertEqual((data[4], data[5], data[6]), (1, 50, 0))
+                self.assertEqual(struct.unpack_from("<H", data, 8)[0], len(data))
+                self.assertEqual(struct.unpack_from("<H", data, 10)[0], 0)
+                self.assertEqual(struct.unpack_from("<I", data, 12)[0], 2000000)
+        menu = src("menu.asm")
+        self.assertIn("HOLD_END_SCREEN:", menu)
+        self.assertIn("CALL HOLD_END_SCREEN", menu)
+        self.assertIn("MENU_FINAL_SCORE", menu)
+        self.assertIn("CALL AY_STOP               ; previous in-game tune", menu)
+        self.assertIn("CALL AY_STOP               ; prevent in-game AY", menu)
 
 
 if __name__ == "__main__":

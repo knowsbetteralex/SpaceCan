@@ -101,8 +101,13 @@ class Aym2SpaceCanTests(unittest.TestCase):
                 self.assertEqual(len(b), expected_size)
                 self.assertEqual(b[7], count)
                 self.assertEqual(decode(a), decode(b))
-        self.assertEqual(decode((MUSIC / "game_over.aym").read_bytes())[1], 2_000_000)
-        self.assertEqual(decode((MUSIC / "victory.aym").read_bytes())[1], 2_000_000)
+        for original, packed in (("victory.aym", "victory1.aym"),
+                                 ("game_over.aym", "game_over1.aym")):
+            with self.subTest(packed=packed):
+                a, b = (MUSIC / original).read_bytes(), (MUSIC / packed).read_bytes()
+                self.assertEqual(decode(a), decode(b))
+                self.assertEqual(b[:4], b"AYM2")
+                self.assertEqual(b[6], 0)  # ending theme must not loop
 
     def test_player_dispatch_and_all_aym2_opcodes(self):
         player = (ROOT / "ay_player.asm").read_text()
@@ -124,8 +129,8 @@ class Aym2SpaceCanTests(unittest.TestCase):
         music = (ROOT / "music.asm").read_text()
         self.assertIn('INCBIN "assets/music/main_menu1.aym"', music)
         self.assertIn('INCBIN "assets/music/midiver1.aym"', music)
-        self.assertIn('INCBIN "assets/music/game_over.aym"', music)
-        self.assertIn('INCBIN "assets/music/victory.aym"', music)
+        self.assertIn('INCBIN "assets/music/game_over1.aym"', music)
+        self.assertIn('INCBIN "assets/music/victory1.aym"', music)
 
     def test_dictionary_mute_and_short_opcodes_reachable(self):
         frames = [(MUSIC / name).read_bytes() for name in ("midiver1.aym", "main_menu1.aym")]

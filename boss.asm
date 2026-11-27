@@ -56,7 +56,6 @@ BOSS_RESET_ENTRY:
     XOR A
     LD (BOSS_SHOT_CLOCK),A       ; reset player cooldown per life
     LD (BOSS_FIGHT_READY),A     ; lock player fire until first boss volley
-    LD (BOSS_MODE_KEY_HELD),A
     LD (BOSS_ATTACK_CYCLE),A
     LD (BOSS_DOUBLE_WAIT),A
     LD (BOSS_PLASMA_CHARGE),A
@@ -66,7 +65,7 @@ BOSS_RESET_ENTRY:
     LD A,(SHIP_HALF_POS)
     LD (BOSS_STILL_LAST_HALF),A
     LD A,1
-    LD (BOSS_MODE_DIRTY),A
+    LD (BOSS_AVOID_DIRTY),A
     LD (BOSS_ACTIVE),A
     LD (BOSS_DIRTY),A
     LD (GAUGE_DIRTY),A

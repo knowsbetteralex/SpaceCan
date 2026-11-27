@@ -6,8 +6,7 @@ READ_INPUT:
     XOR A
     LD (MOVE_CHANGED_THIS_TICK),A ; movement is measured by actual 4px steps
     CALL READ_SHIP_HORIZONTAL
-    CALL READ_FIRE_KEY
-    JP BOSS_READ_ATTACK_KEYS
+    JP READ_FIRE_KEY              ; no boss-mode keys in the demo
 
 ; The 8x8 ship stays within X=8..23, Y=22, now moving in 4px steps.
 ; Banking is independent:
